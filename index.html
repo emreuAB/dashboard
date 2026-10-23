@@ -253,7 +253,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
         <div class="hidden"><select id="cmpY1"></select><select id="cmpY2"></select></div>
         <div class="filter-group"><label>Bölge</label><select id="fBolge" multiple></select><div class="multi-select" data-select="fBolge"></div></div>
         <div class="filter-group"><label></label> Alt Grup<select id="fUrunGrubu" multiple></select><div class="multi-select" data-select="fUrunGrubu"></div></div>
-        <div class="filter-group"><label>BBG ve Katı</label><select id="fUrun" multiple></select><div class="multi-select" data-select="fUrun"></div><span class="product-hint" id="productHint"></span></div>
+        <div class="filter-group"><label>Ürün Grubu</label><select id="fUrun" multiple></select><div class="multi-select" data-select="fUrun"></div><span class="product-hint" id="productHint"></span></div>
         <div class="filter-group"><label>Yönetici</label><select id="fYonetici" multiple></select><div class="multi-select" data-select="fYonetici"></div></div>
         <div class="filter-group"><label>İl</label><select id="fIl" multiple></select><div class="multi-select" data-select="fIl"></div></div>
         <div class="filter-group"><label>Ay</label><select id="fAy" multiple></select><div class="multi-select" data-select="fAy"></div></div>
@@ -309,7 +309,8 @@ const USERS = { admin: '2503', satis: '1453', BatiAkdeniz: '0707', DoguAkdeniz: 
 const REGION_USERS = { BatiAkdeniz:'Batı Akdeniz', DoguAkdeniz:'Doğu Akdeniz', Ege:'Ege', GAP:'GAP', 'GenelMud.Ihracat':'Genel Müd. İhracat', 'GenelMud.YurtiIci':'Genel Müd. Yurtiçi', GuneydoguAnadolu:'Güneydoğu Anadolu', IcAnadolu:'İç Anadolu', Karadeniz:'Karadeniz', Marmara:'Marmara' };
 const HEADERS = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge'];
 const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-const DB_NAME = 'SalesDashboardDB', DB_VERSION = 1, STORE_NAME = 'salesData';
+const DB_NAME = 'SalesDashboardDB', DB_VERSION = 2, STORE_NAME = 'salesData';
+const DATA_CHUNK_SIZE = 10000;
 let currentUser = null, currentRegion = null, data = [], db = null;
 
 function initDB() {
@@ -323,43 +324,55 @@ function initDB() {
     };
   });
 }
+function dbRequest(mode, action) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction([STORE_NAME], mode);
+      const store = tx.objectStore(STORE_NAME);
+      let result;
+      action(store, value => { result=value; }, reject, tx);
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error || new Error('IndexedDB işlemi başarısız'));
+      tx.onabort = () => reject(tx.error || new Error('IndexedDB işlemi iptal edildi'));
+    } catch (e) { reject(e); }
+  });
+}
 async function saveData() {
   if (!db) { const ok = await initDB(); if (!ok) return false; }
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction([STORE_NAME], 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      store.put(data, 'records');
-      tx.oncomplete = () => { console.log('IndexedDB kayıt:', data.length); resolve(true); };
-      tx.onerror = () => { console.error('IndexedDB kayıt hatası'); resolve(false); };
-    } catch(e) { console.error(e); resolve(false); }
-  });
+  try {
+    // Tek dev dizi yerine 10.000 satırlık parçalar sakla; eski kayıt biçimini de temizle.
+    await dbRequest('readwrite', (store, resolve) => { store.clear(); store.put({count:data.length, chunkSize:DATA_CHUNK_SIZE}, 'meta'); resolve(); });
+    for (let start=0, part=0; start<data.length; start+=DATA_CHUNK_SIZE, part++) {
+      const chunk = data.slice(start, start + DATA_CHUNK_SIZE);
+      await dbRequest('readwrite', (store, resolve) => { store.put(chunk, 'chunk_' + part); resolve(); });
+    }
+    console.log('IndexedDB parçalı kayıt:', data.length);
+    return true;
+  } catch(e) { console.error('IndexedDB kayıt hatası:', e); return false; }
 }
 async function loadData() {
   if (!db) { const ok = await initDB(); if (!ok) return; }
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction([STORE_NAME], 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get('records');
-      req.onsuccess = () => {
-        if (req.result) { data = req.result; console.log('IndexedDB yükleme:', data.length); }
-        else { console.log('IndexedDB boş, bellek:', data.length); }
-        resolve();
-      };
-      req.onerror = () => { console.error('IndexedDB okuma hatası'); resolve(); };
-    } catch(e) { console.error(e); resolve(); }
-  });
+  try {
+    const meta = await dbRequest('readonly', (store, resolve) => { const r=store.get('meta'); r.onsuccess=()=>resolve(r.result || null); });
+    if (meta && Number.isFinite(meta.count)) {
+      const loaded=[];
+      const chunks=Math.ceil(meta.count/(meta.chunkSize || DATA_CHUNK_SIZE));
+      for(let i=0;i<chunks;i++) {
+        const part=await dbRequest('readonly', (store, resolve) => { const r=store.get('chunk_'+i); r.onsuccess=()=>resolve(r.result || []); });
+        loaded.push(...part);
+      }
+      data=loaded;
+    } else {
+      // Önceki sürümdeki tek kayıt biçimiyle geriye dönük uyumluluk.
+      const old=await dbRequest('readonly', (store, resolve) => { const r=store.get('records'); r.onsuccess=()=>resolve(r.result || []); });
+      data=Array.isArray(old)?old:[];
+    }
+    console.log('IndexedDB yükleme:', data.length);
+  } catch(e) { console.error('IndexedDB okuma hatası:',e); data=[]; }
 }
 async function deleteData() {
   if (!db) return;
-  return new Promise((resolve) => {
-    const tx = db.transaction([STORE_NAME], 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.delete('records');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
-  });
+  try { await dbRequest('readwrite', (store, resolve) => { store.clear(); resolve(); }); } catch(e) { console.error(e); }
 }
 
 function fmt(n) { return new Intl.NumberFormat('tr-TR').format(Math.round(n)); }
@@ -378,19 +391,27 @@ async function doLogin() {
   currentUser = u;
   currentRegion = REGION_USERS[u] || null;
   document.getElementById('loginView').classList.add('hidden');
-  
   if (u === 'admin') {
     document.getElementById('adminView').classList.remove('hidden');
     document.getElementById('satisView').classList.add('hidden');
-    await fetchGoogleSheetData(); // Admin girince de veriyi Sheets'ten canlı çek
+    await loadData();
+    renderPreview();
   } else {
     document.getElementById('satisView').classList.remove('hidden');
     document.getElementById('adminView').classList.add('hidden');
     const titleEl = document.getElementById('salesTopTitle');
     if (titleEl) titleEl.textContent = currentRegion ? '📊 Satış Analiz Dashboard — ' + currentRegion : '📊 Satış Analiz Dashboard';
-    
-    // Satış kullanıcısı girince doğrudan Google Sheets'ten canlı veri çek
-    await fetchGoogleSheetData();
+    await loadData();
+    console.log('Satış girişi - Veri sayısı:', data.length);
+    if (data.length === 0) {
+      document.getElementById('noDataBanner').classList.remove('hidden');
+      document.getElementById('dashboardContent').classList.add('hidden');
+    } else {
+      document.getElementById('noDataBanner').classList.add('hidden');
+      document.getElementById('dashboardContent').classList.remove('hidden');
+      initFilters();
+      renderDashboard();
+    }
   }
 }
 function logout() {
@@ -417,81 +438,73 @@ function msg(id, text, type) {
   setTimeout(() => el.textContent = '', 6000);
 }
 
+function parseLocaleNumber(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  let s=String(value).trim().replace(/[\s\u00A0\u202F]/g,'').replace(/₺|TL/gi,'');
+  if (!s) return 0;
+  const comma=s.lastIndexOf(','), dot=s.lastIndexOf('.');
+  if (comma>-1 && dot>-1) {
+    // Türkçe 1.234,56; İngilizce 1,234.56 biçimlerini ayırt et.
+    if (comma>dot) s=s.replace(/\./g,'').replace(',', '.');
+    else s=s.replace(/,/g,'');
+  } else if (comma>-1) s=s.replace(',', '.');
+  const n=Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+function normalizeExcelRow(source, headers) {
+  const r={};
+  headers.forEach((h,i)=>{ const key=String(h ?? '').replace(/\u00A0/g,' ').trim(); if(key) r[key]=source[i] ?? ''; });
+  ['Bütçe','Satış','Sevk','Sipariş','Bakiye'].forEach(k=>{
+    const aliases={Sevk:['SEVK','Sevkiyat'],Sipariş:['SİPARİŞ','Siparis','SIPARIS'],Bakiye:['BAKİYE','BAKIYE']}[k] || [];
+    let v=r[k]; if(v===undefined || v==='') for(const a of aliases) if(r[a]!==undefined && r[a]!==''){v=r[a];break;}
+    if(k in r || v!==undefined) r[k]=parseLocaleNumber(v);
+  });
+  if ('Yıl' in r) r['Yıl']=parseInt(String(r['Yıl']).trim(),10) || 0;
+  for(const k of ['Bölge','Ürün','İl','Ay','Yönetici','Ürün Adı','Ürün Grubu','TKK Bölge']) if(k in r && typeof r[k]==='string') r[k]=r[k].trim();
+  return r;
+}
 async function handleFile(file) {
   if (!file) return;
+  if (!/\.(xlsx|xls|xlsm)$/i.test(file.name)) { msg('uploadMsg','Lütfen Excel (.xlsx, .xls veya .xlsm) dosyası seçin.','err'); return; }
   const reader = new FileReader();
   reader.onload = async function(e) {
     try {
-      const buffer = e.target.result;
-      const workbook = XLSX.read(buffer, { type: "array" });
+      msg('uploadMsg','Excel okunuyor; büyük dosyalarda bu işlem birkaç dakika sürebilir…','ok');
+      await new Promise(resolve=>setTimeout(resolve,30));
+      const workbook = XLSX.read(e.target.result, { type:'array', cellDates:false });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      rows.forEach(r => {
-        r['Bütçe'] = parseFloat(r['Bütçe']) || 0;
-        r['Satış'] = parseFloat(r['Satış']) || 0;
-        r['Sevk'] = parseFloat(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat'] ?? 0) || 0;
-        r['Sipariş'] = parseFloat(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS'] ?? 0) || 0;
-        r['Bakiye'] = parseFloat(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE'] ?? 0) || 0;
-        r['Yıl'] = parseInt(r['Yıl']) || 0;
-      });
-      data = rows;
-      const saved = await saveData();
-      msg("uploadMsg", rows.length + " kayıt " + (saved ? "başarıyla kaydedildi" : "yüklendi ancak kaydedilemedi"), saved ? "ok" : "err");
-      renderPreview();
-      if (!document.getElementById('satisView').classList.contains('hidden')) {
-        initFilters(); renderDashboard();
+      if(!sheet || !sheet['!ref']) throw new Error('Excel sayfasında okunabilir veri bulunamadı.');
+      const range=XLSX.utils.decode_range(sheet['!ref']);
+      const headerRows=XLSX.utils.sheet_to_json(sheet,{header:1,range:{s:{r:range.s.r,c:range.s.c},e:{r:range.s.r,c:range.e.c}},defval:'',blankrows:false});
+      const headers=(headerRows[0]||[]).map(v=>String(v??'').replace(/\u00A0/g,' ').trim());
+      const required=['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış'];
+      const missing=required.filter(h=>!headers.includes(h));
+      if(missing.length) throw new Error('Beklenen sütunlar bulunamadı: '+missing.join(', ')+'. Başlık satırını kontrol edin.');
+      const rows=[];
+      const totalRows=Math.max(0,range.e.r-range.s.r);
+      const batchSize=20000;
+      for(let start=range.s.r+1; start<=range.e.r; start+=batchSize){
+        const end=Math.min(range.e.r,start+batchSize-1);
+        const block=XLSX.utils.sheet_to_json(sheet,{header:1,range:{s:{r:start,c:range.s.c},e:{r:end,c:range.e.c}},defval:'',blankrows:false,raw:true});
+        for(const values of block){
+          if(!values.some(v=>v!=='' && v!==null && v!==undefined)) continue;
+          rows.push(normalizeExcelRow(values,headers));
+        }
+        msg('uploadMsg','Excel işleniyor: '+Math.min(end-range.s.r,totalRows).toLocaleString('tr-TR')+' / '+totalRows.toLocaleString('tr-TR')+' satır…','ok');
+        await new Promise(resolve=>setTimeout(resolve,0));
       }
-    } catch (err) {
-      msg("uploadMsg", "Hata: " + err.message, "err");
-    }
+      data=rows;
+      const saved=await saveData();
+      if(!saved) throw new Error('Veriler okundu ancak tarayıcı depolamasına kaydedilemedi. Depolama alanı veya tarayıcı sınırı olabilir.');
+      msg('uploadMsg',rows.length.toLocaleString('tr-TR')+' kayıt okundu ve bu tarayıcıya kaydedildi. Önemli: GitHub Pages bu veriyi diğer kullanıcılara otomatik paylaşmaz.','ok');
+      renderPreview();
+      if (!document.getElementById('satisView').classList.contains('hidden')) { initFilters(); renderDashboard(); }
+    } catch (err) { console.error(err); msg('uploadMsg','Yükleme hatası: '+err.message,'err'); }
   };
+  reader.onerror=()=>msg('uploadMsg','Dosya tarayıcı tarafından okunamadı.','err');
   reader.readAsArrayBuffer(file);
 }
-// Google Sheets'ten veriyi otomatik çeken fonksiyon
-async function fetchGoogleSheetData() {
-  // Web'de yayınlanmış veya gviz endpoint bağlantısı (CORS engellerini aşar)
-  const sheetUrl = 'https://docs.google.com/spreadsheets/d/1G27fjJEBNSZKbBOVaXIfBwsdn_ehtMRV/gviz/tq?tqx=out:csv';
-  const msgEl = document.getElementById("uploadMsg");
-  
-  try {
-    const response = await fetch(sheetUrl);
-    if (!response.ok) throw new Error('Google Sheets erişim hatası!');
-    
-    const csvText = await response.text();
-    const workbook = XLSX.read(csvText, { type: 'string' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    
-    if (rows && rows.length > 0) {
-      rows.forEach(r => {
-        r['Bütçe'] = parseFloat(r['Bütçe']) || 0;
-        r['Satış'] = parseFloat(r['Satış']) || 0;
-        r['Sipariş'] = parseFloat(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS'] ?? 0) || 0;
-        r['Bakiye'] = parseFloat(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE'] ?? 0) || 0;
-        r['Yıl'] = parseInt(r['Yıl']) || 0;
-      });
-      
-      data = rows;
-      await saveData(); // Güncel veriyi kaydediyoruz
-      console.log("Google Sheets'ten canlı çekilen kayıt sayısı:", data.length);
-      
-      if (msgEl) msg("uploadMsg", data.length + " kayıt Google Sheets'ten güncellendi", "ok");
-      
-      document.getElementById('noDataBanner').classList.add('hidden');
-      document.getElementById('dashboardContent').classList.remove('hidden');
-      
-      renderPreview();
-      initFilters();
-      renderDashboard();
-    }
-  } catch (err) {
-    console.error("Otomatik veri çekme hatası:", err);
-    if (msgEl) msg("uploadMsg", "Canlı veri çekilemedi, yerel veri kullanılıyor: " + err.message, "err");
-  }
-}
-// Sayfa ilk yüklendiğinde otomatik çalıştır
-window.addEventListener('DOMContentLoaded', fetchGoogleSheetData);
-
 
 const dropZone = document.getElementById('dropZone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -588,7 +601,7 @@ function initFilters() {
   }
   setOpts('fUrun', unique('Ürün'));
   updateProductOptions();
-  setOpts('fUrunGrubu', unique('Ürün Adı'));
+  setOpts('fUrunGrubu', unique('Ürün Grubu'));
   
   setOpts('fIl', unique('İl'));
   const aySirasi = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
@@ -1632,5 +1645,103 @@ function showDashboardPage(){
   renderDashboard();
 }
 </script>
+
+<style id="ai-assistant-styles">
+#aiAssistantLauncher{position:fixed;right:24px;bottom:24px;z-index:99990;border:0;border-radius:999px;padding:15px 20px;background:#17212d;color:#fff;box-shadow:0 10px 32px rgba(15,23,42,.25);font-weight:700;cursor:pointer;font:600 14px system-ui,sans-serif}
+#aiAssistantPanel{position:fixed;right:24px;bottom:88px;width:min(460px,calc(100vw - 24px));height:min(700px,calc(100vh - 120px));z-index:99991;background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 18px 60px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033}
+#aiAssistantPanel.ai-open{display:flex}#aiAssistantPanel *{box-sizing:border-box}
+.ai-head{background:#17212d;color:#fff;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}.ai-head-title{font-size:15px;font-weight:750}.ai-head-sub{font-size:11px;color:#d1d5db;margin-top:3px}.ai-head button{background:transparent;color:#fff;border:0;font-size:22px;cursor:pointer;padding:3px 8px}
+.ai-suggestions{padding:10px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid #eef0f3}.ai-suggestions button{border:1px solid #e0e5eb;background:#f8fafc;color:#344054;border-radius:999px;padding:7px 10px;font-size:11px;cursor:pointer}
+#aiAssistantMessages{flex:1;overflow:auto;padding:14px;background:#f7f8fa;display:flex;flex-direction:column;gap:10px}.ai-msg{max-width:94%;padding:11px 12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}.ai-msg.user{align-self:flex-end;background:#17212d;color:#fff;border-bottom-right-radius:4px}.ai-msg.assistant{align-self:flex-start;background:#fff;border:1px solid #e7ebf0;border-bottom-left-radius:4px}.ai-msg.error{background:#fff1f2;border-color:#fecdd3;color:#9f1239}.ai-msg .ai-msg-actions{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}.ai-msg-actions button{border:1px solid #d9dee7;border-radius:7px;background:#fff;padding:6px 8px;font-size:11px;cursor:pointer;color:#344054}
+.ai-compose{padding:12px;border-top:1px solid #e7ebf0;background:#fff}.ai-compose textarea{width:100%;min-height:70px;max-height:150px;resize:vertical;border:1px solid #d8dee8;border-radius:10px;padding:10px;font:13px/1.4 inherit;outline:none}.ai-compose textarea:focus{border-color:#64748b}.ai-compose-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px}.ai-compose small{font-size:10px;color:#7b8494}.ai-send{border:0;border-radius:9px;background:#17212d;color:#fff;padding:10px 16px;font-weight:700;cursor:pointer}.ai-send:disabled{opacity:.55;cursor:wait}.ai-setup{padding:10px 12px;border-bottom:1px solid #e7ebf0;background:#fffbeb;color:#92400e;font-size:11px;display:none}.ai-setup input{width:100%;margin-top:6px;border:1px solid #e5d6b3;border-radius:7px;padding:8px;font-size:12px}
+.ai-rich h3{font-size:14px;margin:9px 0 5px}.ai-rich p{margin:5px 0}.ai-rich ul{padding-left:18px;margin:5px 0}.ai-rich table{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;display:block;overflow-x:auto}.ai-rich th,.ai-rich td{border:1px solid #e5e7eb;padding:6px;text-align:left;white-space:normal}.ai-rich th{background:#f3f4f6}.ai-rich strong{font-weight:750}
+@media(max-width:600px){#aiAssistantLauncher{right:12px;bottom:12px;padding:13px 16px}#aiAssistantPanel{right:8px;bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 92px)}}
+</style>
+<button id="aiAssistantLauncher" type="button" aria-label="Yapay zekâ satış asistanını aç">✦ Yapay Zekâ Asistanı</button>
+<section id="aiAssistantPanel" role="dialog" aria-label="GÜBRETAŞ Yapay Zekâ Satış Asistanı">
+  <header class="ai-head"><div><div class="ai-head-title">✦ GÜBRETAŞ Satış Asistanı</div><div class="ai-head-sub">Yerel veri analizi • İnternet ve API gerekmez</div></div><div style="display:flex;gap:4px;align-items:center"><button id="aiAssistantClose" type="button" aria-label="Kapat">×</button></div></header>
+
+  <div class="ai-suggestions"><button type="button" data-ai-q="Bütçe gerçekleşmesini bölge bazında analiz et; en geride kalanları sırala.">Bölge analizi</button><button type="button" data-ai-q="Bütçesi olup satışı sıfır olan ürünleri bul ve önem sırasına koy.">Satışsız ürünler</button><button type="button" data-ai-q="Satış yöneticilerinin performansını bütçe gerçekleşmesine göre değerlendir.">Yönetici performansı</button><button type="button" data-ai-q="Yönetim için kısa bir özet ve gönderime hazır e-posta taslağı oluştur.">Yönetici e-postası</button></div>
+  <div id="aiAssistantMessages" aria-live="polite"><div class="ai-msg assistant">Merhaba! Yüklediğin Excel verisini bu tarayıcıda analiz edebilirim. İnternet bağlantısı veya API anahtarı gerekmez. Bölge, ürün, yönetici, yıl ve bütçe gerçekleşmesiyle ilgili sorularını yazabilirsin. Sonuçlar yüklenen verilerden hesaplanır; veride bulunmayan nedenleri varsaymam.</div></div>
+  <form id="aiAssistantForm" class="ai-compose"><textarea id="aiAssistantQuestion" placeholder="Örn. 2026 yılında bütçesi olup satışı olmayan ürünleri analiz et..." required></textarea><div class="ai-compose-row"><small id="aiAssistantStatus">Yerel analiz etkin • Veriler cihazında kalır.</small><button id="aiAssistantSend" class="ai-send" type="submit">Gönder ↑</button></div></form>
+</section>
+<script id="ai-assistant-client">
+(function(){
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const panel=$('aiAssistantPanel'), messages=$('aiAssistantMessages'), form=$('aiAssistantForm'), question=$('aiAssistantQuestion'), send=$('aiAssistantSend'), status=$('aiAssistantStatus');
+ let history=[];
+ const fmtAI=n=>new Intl.NumberFormat('tr-TR',{maximumFractionDigits:1}).format(Number(n)||0);
+ const moneyAI=n=>fmtAI(Math.round(Number(n)||0));
+ const pctAI=n=>'%'+fmtAI(n);
+ $('aiAssistantLauncher').addEventListener('click',()=>{panel.classList.toggle('ai-open');if(panel.classList.contains('ai-open'))question.focus()});
+ $('aiAssistantClose').addEventListener('click',()=>panel.classList.remove('ai-open'));
+ document.querySelectorAll('[data-ai-q]').forEach(b=>b.addEventListener('click',()=>{question.value=b.dataset.aiQ;form.requestSubmit()}));
+ function addMessage(text,role,actions){const div=document.createElement('div');div.className='ai-msg '+role;const body=document.createElement('div');body.textContent=text;div.appendChild(body);if(actions){const row=document.createElement('div');row.className='ai-msg-actions';const copy=document.createElement('button');copy.type='button';copy.textContent='Yanıtı kopyala';copy.onclick=()=>{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(()=>{copy.textContent='Kopyalandı'}).catch(()=>{});else{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();copy.textContent='Kopyalandı'}};row.appendChild(copy);const email=document.createElement('button');email.type='button';email.textContent='E-posta taslağı oluştur';email.onclick=()=>{question.value='Bu analiz sonuçlarına dayanarak yönetime gönderilecek kısa, profesyonel bir e-posta taslağı oluştur.';form.requestSubmit()};row.appendChild(email);div.appendChild(row)}messages.appendChild(div);messages.scrollTop=messages.scrollHeight;return div}
+ function selectedFilterRows(){try{return typeof getFiltered==='function'?getFiltered():data.slice()}catch(e){return data.slice()}}
+ function sumAI(rows){return rows.reduce((a,r)=>{a.budget+=Number(r['Bütçe'])||0;a.sales+=Number(r['Satış'])||0;return a},{rows:rows.length,budget:0,sales:0})}
+ function groupAI(rows,key){const m=new Map();rows.forEach(r=>{const name=String(r[key]??'').trim()||'(Boş)';if(!m.has(name))m.set(name,{name,rows:0,budget:0,sales:0});const x=m.get(name);x.rows++;x.budget+=Number(r['Bütçe'])||0;x.sales+=Number(r['Satış'])||0});return [...m.values()].map(x=>({...x,diff:x.sales-x.budget,pct:x.budget?x.sales/x.budget*100:0})).sort((a,b)=>b.sales-a.sales)}
+ function reportGroup(title,list,limit=10){if(!list.length)return title+': Bu kırılımda veri bulunamadı.';return title+'\n'+list.slice(0,limit).map((x,i)=>`${i+1}. ${x.name} — Satış: ${moneyAI(x.sales)} | Bütçe: ${moneyAI(x.budget)} | Fark: ${moneyAI(x.diff)} | Gerçekleşme: ${pctAI(x.pct)}`).join('\n')}
+ function localAnalyze(q){
+   if(!Array.isArray(data)||!data.length)return "Henüz veri yüklenmemiş. Önce dashboard'a giriş yapıp Excel dosyanı yükle.";
+   let rows=selectedFilterRows();
+   const t=q.toLocaleLowerCase('tr-TR');
+   const normAI=v=>String(v??'').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/İ/g,'i').replace(/[^a-z0-9]+/g,' ').trim();
+   const applied=[];
+   // Sorudaki açık yıl, ürün grubu ve bölge koşullarını dashboard filtrelerine ekle.
+   const yearMatch=t.match(/\b(20\d{2})\b/);
+   if(yearMatch){const year=yearMatch[1];rows=rows.filter(r=>String(r['Yıl']??'').trim()===year);applied.push('Yıl: '+year);}
+   if(/\bkat[iı]\b/.test(t)){
+     rows=rows.filter(r=>{const g=normAI(r['Ürün Grubu']??r['ÜrünGrubu']??r['Grup']??'');return g==='kati'||g.includes('kati kimyevi')||g.startsWith('kati ');});
+     applied.push('Ürün Grubu: Katı');
+   } else if(/\bbb[gğ]\b|bitki besleme grubu/.test(t)){
+     rows=rows.filter(r=>{const g=normAI(r['Ürün Grubu']??r['ÜrünGrubu']??'');return g.includes('bbg')||g.includes('bitki besleme');});applied.push('Ürün Grubu: BBG');
+   }
+   const knownRegions=['Batı Akdeniz','Doğu Akdeniz','Güneydoğu Anadolu','İç Anadolu','Marmara','Karadeniz','Ege','GAP'];
+   const requestedRegion=knownRegions.find(region=>normAI(t).includes(normAI(region)));
+   if(requestedRegion){const wanted=normAI(requestedRegion);rows=rows.filter(r=>normAI(r['Bölge']).includes(wanted));applied.push('Bölge: '+requestedRegion);}
+   if(!rows.length)return 'Sorudaki koşullara göre kayıt bulunamadı. Uygulanan koşullar: '+(applied.join(', ')||'mevcut dashboard filtreleri')+'. Dashboard filtrelerini ve Excel sütunlarındaki yıl/bölge/ürün grubu değerlerini kontrol et.';
+   const total=sumAI(rows), realization=total.budget?total.sales/total.budget*100:0, gap=total.sales-total.budget;
+   const dimension=t.includes('yönetici')||t.includes('personel')?'Yönetici':t.includes('ürün grubu')||t.includes('ürün grupları')?'Ürün Grubu':t.includes('ürün')?'Ürün Adı':t.includes('il baz')||t.includes('şehir')?'İl':t.includes('aylık')||t.includes('aylara')||t.includes('ay baz')?'Ay':t.includes('tkk')?'TKK Bölge':t.includes('yıl baz')||t.includes('yıllara')?'Yıl':'Bölge';
+   const groups=groupAI(rows,dimension);
+   if(/en az sat[iı]s[iı]|en az satan|en dusuk sat[iı]s|en düşük sat[iı]s|en az sat[iı]s[ıi] olan ürün|en az satış/.test(normAI(t)) || (/en az/.test(normAI(t))&&/urun/.test(normAI(t))&&/satis/.test(normAI(t)))){
+     const products=groupAI(rows,'Ürün Adı').sort((a,b)=>a.sales-b.sales || b.budget-a.budget);
+     const minSales=products.length?products[0].sales:0;
+     const tied=products.filter(x=>x.sales===minSales);
+     const filterText=applied.length?'Uygulanan koşullar: '+applied.join(' • ')+'\n':'';
+     return filterText+'En az satış yapılan ürün'+(tied.length>1?'ler':'')+':\n'+tied.slice(0,10).map(x=>`• ${x.name} — Satış: ${moneyAI(x.sales)} | Bütçe: ${moneyAI(x.budget)} | Fark: ${moneyAI(x.diff)}`).join('\n')+'\n\nKarşılaştırılan ürün sayısı: '+products.length+' • Analiz edilen kayıt: '+fmtAI(rows.length)+(minSales===0?'\nNot: En düşük satış 0; bu ürün(ler) için seçilen koşullarda satış kaydı oluşmamış.':'');
+   }
+   const zero=groups.filter(x=>x.budget>0&&x.sales===0).sort((a,b)=>b.budget-a.budget);
+   const low=groups.filter(x=>x.budget>0&&x.sales>0&&x.pct<80).sort((a,b)=>a.pct-b.pct);
+   const strong=groups.filter(x=>x.budget>0&&x.pct>=100).sort((a,b)=>b.pct-a.pct);
+   const lines=[];
+   if(/e-?posta|mail|yönetim özeti|yöneticiye|rapor hazırla/.test(t)){
+     const weakest=groups.filter(x=>x.budget>0).sort((a,b)=>a.pct-b.pct).slice(0,5);
+     return `Konu: Satış ve Bütçe Gerçekleşme Analizi\n\nMerhaba,\n\nSeçili dashboard verileri üzerinden yapılan analizde toplam bütçe ${moneyAI(total.budget)}, satış ${moneyAI(total.sales)} ve bütçe gerçekleşmesi ${pctAI(realization)} olarak hesaplanmıştır. Bütçe-satış farkı ${moneyAI(gap)}'dır.\n\nÖne çıkan takip alanları:\n${weakest.length?weakest.map(x=>`• ${x.name}: ${pctAI(x.pct)} gerçekleşme; satış ${moneyAI(x.sales)}, bütçe ${moneyAI(x.budget)}.`).join('\n'):'• Değerlendirilecek bütçeli kırılım bulunamadı.'}\n\nBütçesi bulunmasına rağmen satış oluşmayan kalemlerin ve düşük gerçekleşmeli bölgelerin ilgili ekiplerle kontrol edilmesi; kalan dönem için sipariş, sevk ve satış planlarının netleştirilmesi önerilir. Bu değerlendirme mevcut sayısal sonuçlara dayanır; düşük performansın nedeni veri setinde ayrıca belirtilmedikçe kesinleştirilemez.\n\nİyi çalışmalar.`;
+   }
+   if(/satışsız|satışı olmayan|satış yok|sıfır satış|satışı sıfır|satış olmayan|bütçesi olup/.test(t)){
+     const z=groupAI(rows,'Ürün Adı').filter(x=>x.budget>0&&x.sales===0).sort((a,b)=>b.budget-a.budget);
+     if(!z.length)return 'Seçili verilerde bütçesi pozitif ve satışı sıfır olan ürün bulunamadı.';
+     return `Bütçesi olup satışı olmayan ürünler (${z.length} kalem)\nÖncelik, bütçe tutarı en yüksek olandan başlanarak sıralandı.\n\n${z.slice(0,30).map((x,i)=>`${i+1}. ${x.name} — Bütçe: ${moneyAI(x.budget)} | Satış: 0 | Fark: ${moneyAI(x.diff)}`).join('\n')}\n\nÖneri: Önce bütçesi yüksek kalemlerin satış planı, sipariş durumu ve sevk edilebilirliği ilgili bölgeyle kontrol edilmeli.`;
+   }
+   if(/geride|en düşük|en dusuk|düşük gerçekleş|dusuk gercekles|performans|başarılı|başarı|gerçekleşme|gerceklesme|bölge baz|bölgeleri sırala/.test(t)){
+     const usable=groups.filter(x=>x.budget>0).sort((a,b)=>a.pct-b.pct);
+     return reportGroup(dimension+' bazında bütçe gerçekleşmesi — en düşükten yükseğe',usable,Math.min(15,usable.length))+'\n\nGenel gerçekleşme: '+pctAI(realization)+'. '+(low.length?`%80 altında gerçekleşen ${low.length} ${dimension.toLocaleLowerCase('tr-TR')} var.`:'Bu kırılımda bütçeli grupların hiçbiri %80 altında değil.')+'\nYorum: Öncelikle düşük gerçekleşmeli ve bütçesi yüksek grupların satış/sipariş planı kontrol edilmeli. Veride neden bilgisi olmadığı için sebep tahmini yapılmamıştır.';
+   }
+   if(/en çok satan|en yüksek satış|satış lider|ilk 10|top 10|en iyi/.test(t))return reportGroup(dimension+' bazında en yüksek satış',groups.slice().sort((a,b)=>b.sales-a.sales),10);
+   if(/yıl karşılaştır|yıllık karşılaştır|geçen yıl|önceki yıl|yıla göre|yıllara göre/.test(t))return reportGroup('Yıl bazında satış ve bütçe',groupAI(rows,'Yıl').sort((a,b)=>String(a.name).localeCompare(String(b.name),'tr',{numeric:true})),20);
+   if(/özet|genel durum|analiz et|yorumla|yorum yap|durum nedir|nasıl gidiyor/.test(t)){
+     const sorted=groups.filter(x=>x.budget>0).sort((a,b)=>a.pct-b.pct);
+     return `GENEL SATIŞ ANALİZİ\n\n• Kayıt sayısı: ${fmtAI(rows.length)}\n• Toplam bütçe: ${moneyAI(total.budget)}\n• Toplam satış: ${moneyAI(total.sales)}\n• Bütçe-satış farkı: ${moneyAI(gap)}\n• Bütçe gerçekleşmesi: ${pctAI(realization)}\n\n${reportGroup(dimension+' kırılımı — en düşük gerçekleşme',sorted,5)}\n\n${zero.length?`Dikkat: Bu kırılımda bütçesi olduğu halde satışı olmayan ${zero.length} grup bulunuyor.`:'Bütçesi olup satışı sıfır olan grup bu kırılımda görünmüyor.'}\n\nYönetim yorumu: Gerçekleşme %100 altında ise bütçe açığı vardır. Öncelik, bütçe tutarı yüksek ve gerçekleşmesi düşük gruplara verilmelidir. Veride yer almayan nedenler kesin bilgi gibi sunulmamıştır.`;
+   }
+   // Default answer: useful KPI snapshot and best matching breakdown.
+   return `Sorunu mevcut dashboard verilerinden değerlendirdim.\n\n• Filtrelenmiş kayıt: ${fmtAI(rows.length)}\n• Bütçe: ${moneyAI(total.budget)}\n• Satış: ${moneyAI(total.sales)}\n• Fark (Satış − Bütçe): ${moneyAI(gap)}\n• Gerçekleşme: ${pctAI(realization)}\n\n${reportGroup(dimension+' bazında sonuçlar',groups,10)}\n\nDaha hedefli sonuç için “bütçesi olup satışı olmayan ürünleri bul”, “bölge gerçekleşmesini en düşükten sırala” veya “yönetici performansını analiz et” gibi sorabilirsin.`;
+ }
+ function sendQuestion(q){if(!q.trim())return;addMessage(q,'user');question.value='';send.disabled=true;status.textContent='Yüklenen veriler taranıyor…';const pending=addMessage('Dashboard verileri taranıyor ve toplamlar hesaplanıyor…','assistant');try{const answer=localAnalyze(q);pending.remove();addMessage(answer,'assistant',true);history.push({role:'user',content:q},{role:'assistant',content:answer});history=history.slice(-12);status.textContent='Yerel analiz tamamlandı • '+fmtAI(selectedFilterRows().length)+' kayıt';}catch(e){pending.remove();addMessage('Veri analizi yapılamadı: '+(e.message||'Bilinmeyen hata')+'\n\nÖnce dashboard verisinin yüklü olduğunu ve filtrelerin doğru seçildiğini kontrol et.','error');status.textContent='Analiz hatası';}finally{send.disabled=false;question.focus()}}
+ form.addEventListener('submit',e=>{e.preventDefault();sendQuestion(question.value)});
+ question.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit()}});
+})();
+</script>
+
 </body>
 </html>
