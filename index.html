@@ -309,8 +309,7 @@ const USERS = { admin: '2503', satis: '1453', BatiAkdeniz: '0707', DoguAkdeniz: 
 const REGION_USERS = { BatiAkdeniz:'Batı Akdeniz', DoguAkdeniz:'Doğu Akdeniz', Ege:'Ege', GAP:'GAP', 'GenelMud.Ihracat':'Genel Müd. İhracat', 'GenelMud.YurtiIci':'Genel Müd. Yurtiçi', GuneydoguAnadolu:'Güneydoğu Anadolu', IcAnadolu:'İç Anadolu', Karadeniz:'Karadeniz', Marmara:'Marmara' };
 const HEADERS = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge'];
 const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-const DB_NAME = 'SalesDashboardDB', DB_VERSION = 2, STORE_NAME = 'salesData';
-const DATA_CHUNK_SIZE = 10000;
+const DB_NAME = 'SalesDashboardDB', DB_VERSION = 1, STORE_NAME = 'salesData';
 let currentUser = null, currentRegion = null, data = [], db = null;
 
 function initDB() {
@@ -324,55 +323,43 @@ function initDB() {
     };
   });
 }
-function dbRequest(mode, action) {
-  return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction([STORE_NAME], mode);
-      const store = tx.objectStore(STORE_NAME);
-      let result;
-      action(store, value => { result=value; }, reject, tx);
-      tx.oncomplete = () => resolve(result);
-      tx.onerror = () => reject(tx.error || new Error('IndexedDB işlemi başarısız'));
-      tx.onabort = () => reject(tx.error || new Error('IndexedDB işlemi iptal edildi'));
-    } catch (e) { reject(e); }
-  });
-}
 async function saveData() {
   if (!db) { const ok = await initDB(); if (!ok) return false; }
-  try {
-    // Tek dev dizi yerine 10.000 satırlık parçalar sakla; eski kayıt biçimini de temizle.
-    await dbRequest('readwrite', (store, resolve) => { store.clear(); store.put({count:data.length, chunkSize:DATA_CHUNK_SIZE}, 'meta'); resolve(); });
-    for (let start=0, part=0; start<data.length; start+=DATA_CHUNK_SIZE, part++) {
-      const chunk = data.slice(start, start + DATA_CHUNK_SIZE);
-      await dbRequest('readwrite', (store, resolve) => { store.put(chunk, 'chunk_' + part); resolve(); });
-    }
-    console.log('IndexedDB parçalı kayıt:', data.length);
-    return true;
-  } catch(e) { console.error('IndexedDB kayıt hatası:', e); return false; }
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction([STORE_NAME], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(data, 'records');
+      tx.oncomplete = () => { console.log('IndexedDB kayıt:', data.length); resolve(true); };
+      tx.onerror = () => { console.error('IndexedDB kayıt hatası'); resolve(false); };
+    } catch(e) { console.error(e); resolve(false); }
+  });
 }
 async function loadData() {
   if (!db) { const ok = await initDB(); if (!ok) return; }
-  try {
-    const meta = await dbRequest('readonly', (store, resolve) => { const r=store.get('meta'); r.onsuccess=()=>resolve(r.result || null); });
-    if (meta && Number.isFinite(meta.count)) {
-      const loaded=[];
-      const chunks=Math.ceil(meta.count/(meta.chunkSize || DATA_CHUNK_SIZE));
-      for(let i=0;i<chunks;i++) {
-        const part=await dbRequest('readonly', (store, resolve) => { const r=store.get('chunk_'+i); r.onsuccess=()=>resolve(r.result || []); });
-        loaded.push(...part);
-      }
-      data=loaded;
-    } else {
-      // Önceki sürümdeki tek kayıt biçimiyle geriye dönük uyumluluk.
-      const old=await dbRequest('readonly', (store, resolve) => { const r=store.get('records'); r.onsuccess=()=>resolve(r.result || []); });
-      data=Array.isArray(old)?old:[];
-    }
-    console.log('IndexedDB yükleme:', data.length);
-  } catch(e) { console.error('IndexedDB okuma hatası:',e); data=[]; }
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction([STORE_NAME], 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get('records');
+      req.onsuccess = () => {
+        if (req.result) { data = req.result; console.log('IndexedDB yükleme:', data.length); }
+        else { console.log('IndexedDB boş, bellek:', data.length); }
+        resolve();
+      };
+      req.onerror = () => { console.error('IndexedDB okuma hatası'); resolve(); };
+    } catch(e) { console.error(e); resolve(); }
+  });
 }
 async function deleteData() {
   if (!db) return;
-  try { await dbRequest('readwrite', (store, resolve) => { store.clear(); resolve(); }); } catch(e) { console.error(e); }
+  return new Promise((resolve) => {
+    const tx = db.transaction([STORE_NAME], 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.delete('records');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
 }
 
 function fmt(n) { return new Intl.NumberFormat('tr-TR').format(Math.round(n)); }
@@ -438,71 +425,34 @@ function msg(id, text, type) {
   setTimeout(() => el.textContent = '', 6000);
 }
 
-function parseLocaleNumber(value) {
-  if (value === null || value === undefined || value === '') return 0;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  let s=String(value).trim().replace(/[\s\u00A0\u202F]/g,'').replace(/₺|TL/gi,'');
-  if (!s) return 0;
-  const comma=s.lastIndexOf(','), dot=s.lastIndexOf('.');
-  if (comma>-1 && dot>-1) {
-    // Türkçe 1.234,56; İngilizce 1,234.56 biçimlerini ayırt et.
-    if (comma>dot) s=s.replace(/\./g,'').replace(',', '.');
-    else s=s.replace(/,/g,'');
-  } else if (comma>-1) s=s.replace(',', '.');
-  const n=Number(s);
-  return Number.isFinite(n) ? n : 0;
-}
-function normalizeExcelRow(source, headers) {
-  const r={};
-  headers.forEach((h,i)=>{ const key=String(h ?? '').replace(/\u00A0/g,' ').trim(); if(key) r[key]=source[i] ?? ''; });
-  ['Bütçe','Satış','Sevk','Sipariş','Bakiye'].forEach(k=>{
-    const aliases={Sevk:['SEVK','Sevkiyat'],Sipariş:['SİPARİŞ','Siparis','SIPARIS'],Bakiye:['BAKİYE','BAKIYE']}[k] || [];
-    let v=r[k]; if(v===undefined || v==='') for(const a of aliases) if(r[a]!==undefined && r[a]!==''){v=r[a];break;}
-    if(k in r || v!==undefined) r[k]=parseLocaleNumber(v);
-  });
-  if ('Yıl' in r) r['Yıl']=parseInt(String(r['Yıl']).trim(),10) || 0;
-  for(const k of ['Bölge','Ürün','İl','Ay','Yönetici','Ürün Adı','Ürün Grubu','TKK Bölge']) if(k in r && typeof r[k]==='string') r[k]=r[k].trim();
-  return r;
-}
 async function handleFile(file) {
   if (!file) return;
-  if (!/\.(xlsx|xls|xlsm)$/i.test(file.name)) { msg('uploadMsg','Lütfen Excel (.xlsx, .xls veya .xlsm) dosyası seçin.','err'); return; }
   const reader = new FileReader();
   reader.onload = async function(e) {
     try {
-      msg('uploadMsg','Excel okunuyor; büyük dosyalarda bu işlem birkaç dakika sürebilir…','ok');
-      await new Promise(resolve=>setTimeout(resolve,30));
-      const workbook = XLSX.read(e.target.result, { type:'array', cellDates:false });
+      const buffer = e.target.result;
+      const workbook = XLSX.read(buffer, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      if(!sheet || !sheet['!ref']) throw new Error('Excel sayfasında okunabilir veri bulunamadı.');
-      const range=XLSX.utils.decode_range(sheet['!ref']);
-      const headerRows=XLSX.utils.sheet_to_json(sheet,{header:1,range:{s:{r:range.s.r,c:range.s.c},e:{r:range.s.r,c:range.e.c}},defval:'',blankrows:false});
-      const headers=(headerRows[0]||[]).map(v=>String(v??'').replace(/\u00A0/g,' ').trim());
-      const required=['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış'];
-      const missing=required.filter(h=>!headers.includes(h));
-      if(missing.length) throw new Error('Beklenen sütunlar bulunamadı: '+missing.join(', ')+'. Başlık satırını kontrol edin.');
-      const rows=[];
-      const totalRows=Math.max(0,range.e.r-range.s.r);
-      const batchSize=20000;
-      for(let start=range.s.r+1; start<=range.e.r; start+=batchSize){
-        const end=Math.min(range.e.r,start+batchSize-1);
-        const block=XLSX.utils.sheet_to_json(sheet,{header:1,range:{s:{r:start,c:range.s.c},e:{r:end,c:range.e.c}},defval:'',blankrows:false,raw:true});
-        for(const values of block){
-          if(!values.some(v=>v!=='' && v!==null && v!==undefined)) continue;
-          rows.push(normalizeExcelRow(values,headers));
-        }
-        msg('uploadMsg','Excel işleniyor: '+Math.min(end-range.s.r,totalRows).toLocaleString('tr-TR')+' / '+totalRows.toLocaleString('tr-TR')+' satır…','ok');
-        await new Promise(resolve=>setTimeout(resolve,0));
-      }
-      data=rows;
-      const saved=await saveData();
-      if(!saved) throw new Error('Veriler okundu ancak tarayıcı depolamasına kaydedilemedi. Depolama alanı veya tarayıcı sınırı olabilir.');
-      msg('uploadMsg',rows.length.toLocaleString('tr-TR')+' kayıt okundu ve bu tarayıcıya kaydedildi. Önemli: GitHub Pages bu veriyi diğer kullanıcılara otomatik paylaşmaz.','ok');
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      rows.forEach(r => {
+        r['Bütçe'] = parseFloat(r['Bütçe']) || 0;
+        r['Satış'] = parseFloat(r['Satış']) || 0;
+        r['Sevk'] = parseFloat(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat'] ?? 0) || 0;
+        r['Sipariş'] = parseFloat(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS'] ?? 0) || 0;
+        r['Bakiye'] = parseFloat(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE'] ?? 0) || 0;
+        r['Yıl'] = parseInt(r['Yıl']) || 0;
+      });
+      data = rows;
+      const saved = await saveData();
+      msg("uploadMsg", rows.length + " kayıt " + (saved ? "başarıyla kaydedildi" : "yüklendi ancak kaydedilemedi"), saved ? "ok" : "err");
       renderPreview();
-      if (!document.getElementById('satisView').classList.contains('hidden')) { initFilters(); renderDashboard(); }
-    } catch (err) { console.error(err); msg('uploadMsg','Yükleme hatası: '+err.message,'err'); }
+      if (!document.getElementById('satisView').classList.contains('hidden')) {
+        initFilters(); renderDashboard();
+      }
+    } catch (err) {
+      msg("uploadMsg", "Hata: " + err.message, "err");
+    }
   };
-  reader.onerror=()=>msg('uploadMsg','Dosya tarayıcı tarafından okunamadı.','err');
   reader.readAsArrayBuffer(file);
 }
 
