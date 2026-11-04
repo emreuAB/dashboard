@@ -308,30 +308,68 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 const USERS = { admin: '2503', satis: '1453', BatiAkdeniz: '0707', DoguAkdeniz: '3232',Ege: '3535', GAP: '0202', 'GenelMud.Ihracat': '3434', 'GenelMud.YurtiIci': '3434', GuneydoguAnadolu: '2121', IcAnadolu: '0606', Karadeniz: '5555', Marmara: '3434' };
 const REGION_USERS = { BatiAkdeniz:'Batı Akdeniz', DoguAkdeniz:'Doğu Akdeniz', Ege:'Ege', GAP:'GAP', 'GenelMud.Ihracat':'Genel Müd. İhracat', 'GenelMud.YurtiIci':'Genel Müd. Yurtiçi', GuneydoguAnadolu:'Güneydoğu Anadolu', IcAnadolu:'İç Anadolu', Karadeniz:'Karadeniz', Marmara:'Marmara' };
 const HEADERS = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge'];
+
 function parseLocalizedNumber(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (value === null || value === undefined || value === '') return 0;
-  let s = String(value).trim().replace(/[\s\u00A0\u202F₺$€£]/g, '');
-  if (!s || s === '-' || s === '—') return 0;
-  const isNegative = /^\(.*\)$/.test(s);
-  s = s.replace(/[()]/g, '').replace(/[^\d.,+\-]/g, '');
-  if (!s) return 0;
-  const comma = s.lastIndexOf(','), dot = s.lastIndexOf('.');
-  if (comma >= 0 && dot >= 0) {
-    if (comma > dot) s = s.replace(/\./g, '').replace(',', '.');
-    else s = s.replace(/,/g, '');
-  } else if (comma >= 0) {
-    const commas = (s.match(/,/g) || []).length, decimals = s.length - comma - 1;
-    if (commas > 1 && decimals === 3) s = s.replace(/,/g, '');
-    else s = s.replace(/\./g, '').replace(',', '.');
-  } else if (dot >= 0) {
-    const dots = (s.match(/\./g) || []).length, decimals = s.length - dot - 1;
-    if (dots > 1 || decimals === 3) s = s.replace(/\./g, '');
-  }
-  const n = Number(s);
-  if (!Number.isFinite(n)) return 0;
-  return isNegative ? -Math.abs(n) : n;
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    if (value === null || value === undefined || value === '') {
+        return 0;
+    }
+
+    let s = String(value)
+        .trim()
+        .replace(/[\s\u00A0\u202F₺$€£]/g, '');
+
+    if (!s || s === '-' || s === '—') return 0;
+
+    // Negatif değer kontrolü
+    const isNegative = /^\(.*\)$/.test(s) || s.startsWith('-');
+
+    s = s.replace(/[()]/g, '');
+    s = s.replace(/[^\d.,+-]/g, '');
+
+    if (!s) return 0;
+
+    const comma = s.lastIndexOf(',');
+    const dot = s.lastIndexOf('.');
+
+    if (comma >= 0 && dot >= 0) {
+        // 1.250,50 => 1250.50
+        // 1,250.50 => 1250.50
+        if (comma > dot) {
+            s = s.replace(/\./g, '').replace(',', '.');
+        } else {
+            s = s.replace(/,/g, '');
+        }
+    }
+    else if (comma >= 0) {
+        const decimals = s.length - comma - 1;
+        const commas = (s.match(/,/g) || []).length;
+
+        if (commas > 1 || decimals === 3) {
+            s = s.replace(/,/g, '');
+        } else {
+            s = s.replace(',', '.');
+        }
+    }
+    else if (dot >= 0) {
+        const decimals = s.length - dot - 1;
+        const dots = (s.match(/\./g) || []).length;
+
+        if (dots > 1 || decimals === 3) {
+            s = s.replace(/\./g, '');
+        }
+    }
+
+    const n = Number(s);
+
+    if (!Number.isFinite(n)) return 0;
+
+    return isNegative ? -Math.abs(n) : n;
 }
+
 function normalizeImportedRow(row) {
   const out = {};
   for (const [rawKey, value] of Object.entries(row || {})) out[String(rawKey).replace(/^\uFEFF/, '').trim()] = value;
