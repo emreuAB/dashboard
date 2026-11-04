@@ -765,26 +765,29 @@ function resetFilters() {
 
 function getFiltered() {
   const yillar = getSelectedValues('fYil');
-  const bolgeler = getSelectedValues('fBolge');
-   const urunler = getSelectedValues('fUrun');
+  const bolgeler = getSelectedValues('fBolge').map(v => String(v).trim().toLocaleUpperCase('tr-TR'));
+  const urunler = getSelectedValues('fUrun');
   const urunGruplari = getSelectedValues('fUrunGrubu');
- 
   const iller = getSelectedValues('fIl');
   const aylar = getSelectedValues('fAy');
   const yoneticiler = getSelectedValues('fYonetici');
   const tkkler = getSelectedValues('fTKK');
+
   return data.filter(r => {
+    const rBolge = String(r['Bölge'] ?? '').trim().toLocaleUpperCase('tr-TR');
+    
     return (yillar.length === 0 || yillar.includes(String(r['Yıl']))) &&
-           (!currentRegion || String(r['Bölge']).trim() === String(currentRegion).trim()) &&
-           (bolgeler.length === 0 || bolgeler.includes(r['Bölge'])) &&
+           (!currentRegion || rBolge === String(currentRegion).trim().toLocaleUpperCase('tr-TR')) &&
+           (bolgeler.length === 0 || bolgeler.includes(rBolge)) &&
            (urunGruplari.length === 0 || urunGruplari.includes(r['Ürün Grubu'])) &&
-           (urunler.length===0 || urunler.includes(r['Ürün'])) &&
+           (urunler.length === 0 || urunler.includes(r['Ürün'])) &&
            (iller.length === 0 || iller.includes(r['İl'])) &&
            (aylar.length === 0 || aylar.includes(r['Ay'])) &&
            (yoneticiler.length === 0 || yoneticiler.includes(r['Yönetici'])) &&
            (tkkler.length === 0 || tkkler.includes(r['TKK Bölge']));
   });
 }
+
 
 function renderDashboard() {
   syncComparisonYearsFromFilter(false);
