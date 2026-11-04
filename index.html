@@ -536,14 +536,15 @@ async function handleFile(file) {
   reader.readAsArrayBuffer(file);
 }
 // Google Sheets'ten veriyi otomatik çeken fonksiyon
+// Google Sheets'ten veriyi otomatik çeken güncel fonksiyon
 async function fetchGoogleSheetData() {
-  // Web'de yayınlanmış veya gviz endpoint bağlantısı (CORS engellerini aşar)
-  const sheetUrl = 'https://docs.google.com/spreadsheets/d/1abIL9bTCmkO-J9Qrn-Gx5xrPn0NMT2cIbegjo1K_nOY/gviz/tq?gid=256809626&tqx=out:csv';
+  // Doğrudan yayınlanmış Google Sheets CSV endpoint adresi
+  const sheetUrl = 'https://docs.google.com/spreadsheets/d/1abIL9bTCmkO-J9Qrn-Gx5xrPn0NMT2cIbegjo1K_nOY/gviz/tq?tqx=out:csv';
   const msgEl = document.getElementById("uploadMsg");
   
   try {
     const response = await fetch(sheetUrl);
-    if (!response.ok) throw new Error('Google Sheets erişim hatası!');
+    if (!response.ok) throw new Error('Google Sheets erişim hatası! Lütfen bağlantı izinlerini kontrol edin.');
     
     const csvText = await response.text();
     const workbook = XLSX.read(csvText, { type: 'string' });
@@ -551,34 +552,33 @@ async function fetchGoogleSheetData() {
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true }).map(normalizeImportedRow);
     
     if (rows && rows.length > 0) {
-      if (data.length > rows.length) {
-        console.warn('Google Sheets verisi mevcut veriden daha az kayıt içeriyor; mevcut veri korunuyor.', { mevcut: data.length, sheets: rows.length });
-        return;
-      }
       rows.forEach(r => {
         r['Bütçe'] = parseLocalizedNumber(r['Bütçe']);
         r['Satış'] = parseLocalizedNumber(r['Satış']);
+        r['Sevk'] = parseLocalizedNumber(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat'] ?? 0);
         r['Sipariş'] = parseLocalizedNumber(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS'] ?? 0);
         r['Bakiye'] = parseLocalizedNumber(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE'] ?? 0);
         r['Yıl'] = parseInt(String(r['Yıl'] ?? '').trim(), 10) || 0;
       });
       
       data = rows;
-      await saveData(); // Güncel veriyi kaydediyoruz
-      console.log("Google Sheets'ten canlı çekilen kayıt sayısı:", data.length);
+      await saveData(); // Verileri tarayıcı hafızasına (IndexedDB) güvenle kaydet
+      console.log("Google Sheets'ten başarıyla çekilen kayıt sayısı:", data.length);
       
-      if (msgEl) msg("uploadMsg", data.length + " kayıt Google Sheets'ten güncellendi", "ok");
+      if (msgEl) msg("uploadMsg", data.length + " kayıt Google Sheets'ten başarıyla güncellendi", "ok");
       
-      document.getElementById('noDataBanner').classList.add('hidden');
-      document.getElementById('dashboardContent').classList.remove('hidden');
+      const noDataBanner = document.getElementById('noDataBanner');
+      if (noDataBanner) noDataBanner.classList.add('hidden');
+      const dashboardContent = document.getElementById('dashboardContent');
+      if (dashboardContent) dashboardContent.classList.remove('hidden');
       
       renderPreview();
       initFilters();
       renderDashboard();
     }
   } catch (err) {
-    console.error("Otomatik veri çekme hatası:", err);
-    if (msgEl) msg("uploadMsg", "Canlı veri çekilemedi, yerel veri kullanılıyor: " + err.message, "err");
+    console.error("Veri çekme hatası:", err);
+    if (msgEl) msg("uploadMsg", "Veri çekilemedi: " + err.message, "err");
   }
 }
 // Sayfa ilk yüklendiğinde otomatik çalıştır
