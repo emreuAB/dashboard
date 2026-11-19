@@ -4,7 +4,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Satış Analiz Dashboard</title>
+<title>GÜBRETAŞ Satış Analiz Dashboard</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#f4f6f8;--card:#fff;--text:#172033;--muted:#7b8494;--border:#e7ebf0;--blue:#3b82f6;--green:#16b364;--red:#ef4444;--orange:#f59e0b;--shadow:0 3px 16px rgba(15,23,42,.06)}
@@ -203,11 +203,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 .budget-page-head{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #eef1f4;border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow)}
 .budget-page-title{font-size:18px;font-weight:750;color:#172033}.budget-page-subtitle{font-size:12px;color:#98a2b3;margin-top:4px}
 .budget-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.budget-list-card{background:#fff;border:1px solid #eef1f4;border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow);overflow:auto}
+.budget-list-card{background:#fff;border:1px solid #eef1f4;border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow);overflow:auto;cursor:zoom-in;transition:box-shadow .15s ease}.budget-list-card:hover{box-shadow:0 8px 24px rgba(16,24,40,.12)}
 .budget-list-title{font-size:16px;font-weight:700;color:#1d2939;margin-bottom:4px}.budget-list-subtitle{font-size:12px;color:#98a2b3;margin-bottom:10px}
 .budget-table{width:100%;min-width:900px;border-collapse:collapse;font-size:13px}.budget-table th{background:#f7f8fa;color:#667085;font-size:11px;font-weight:700;text-align:right;padding:10px 12px;border-bottom:1px solid #e7e9ee;white-space:nowrap;cursor:pointer}.budget-table th:first-child,.budget-table td:first-child{text-align:left}.budget-table td{padding:10px 12px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}.budget-table td:first-child{font-weight:600;color:#1d2939}.budget-table tr:last-child td{border-bottom:0}.budget-total td{background:#f8fafc;font-weight:800!important;border-top:2px solid #dfe3ea}.budget-positive{color:#16a34a;font-weight:700}.budget-negative{color:#dc2626;font-weight:700}
 @media(max-width:900px){.budget-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.budget-kpi-grid{grid-template-columns:1fr}.budget-page-head{align-items:flex-start;gap:10px;flex-direction:column}}
 </style>
+<style>.cons-hide{display:none!important}</style>
 </head>
 <body>
 <div id="loginView">
@@ -231,9 +232,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
         <p style="font-size:13px;color:#888;margin-bottom:18px;">veya</p>
         <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
         <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Dosya Seç</button>
-        <p style="font-size:12px;color:#aaa;margin-top:18px;">Beklenen başlıklar:<br><strong>Yıl, Bölge, Ürün, İl, Ay, Yönetici, Bütçe, Satış, Ürün Adı, Ürün Adı, TKK Bölge</strong></p>
+        <p style="font-size:12px;color:#aaa;margin-top:18px;">Beklenen 15 başlık:<br><strong>Yıl, Bölge, Ürün, İl, Ay, Yönetici, Bütçe, Satış, Ürün Adı, Ürün Grubu, TKK Bölge, Bakiye, Sipariş, Cari Hesap Adı, Dağıtım Kanalı</strong><br>GÜBRETAŞ Tüketim Analizi ekranı için ek (opsiyonel) 2 başlık:<br><strong>TÜKETİM MİKTARI, KOOPERATİF ADI</strong></p>
       </div>
       <div id="uploadMsg"></div>
+      <div id="uploadProgressWrap" class="hidden" style="margin:12px 0 18px;background:#eef1f4;border-radius:10px;overflow:hidden;height:24px;">
+        <div id="uploadProgressBar" style="height:24px;width:0%;background:#16834a;color:#fff;text-align:center;font-size:12px;line-height:24px;transition:width .15s;">0%</div>
+      </div>
+      <div id="uploadProgressText" style="font-size:12px;color:#667085;margin-bottom:14px;"></div>
       <button class="btn btn-sm btn-danger" onclick="clearData()">Tüm Verileri Sil</button>
     </div>
     <div id="adminPreview" class="hidden">
@@ -244,7 +249,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 </div>
 
 <div id="satisView" class="hidden">
-  <div class="topbar"><h1 id="salesTopTitle">📊 Satış Analiz Dashboard</h1><div><span class="user">Satış</span><button id="budgetPageBtn" class="btn btn-sm" onclick="showBudgetRealizationPage()">📋 Bütçe Gerçekleşme</button><button id="balancePageBtn" class="btn btn-sm" onclick="showSalesBalancePage()">📊 Satış Bakiye Raporu</button><button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button></div></div>
+  <div class="topbar"><h1 id="salesTopTitle">📊 Satış Analiz Dashboard</h1><div><span class="user">Satış</span><button id="budgetPageBtn" class="btn btn-sm" onclick="showBudgetRealizationPage()">📋 Bütçe Gerçekleşme</button><button id="balancePageBtn" class="btn btn-sm" onclick="showSalesBalancePage()">📊 Satış Bakiye Raporu</button><button id="consumptionPageBtn" class="btn btn-sm" onclick="showConsumptionPage()">🌾 GÜBRETAŞ Tüketim Analizi</button><button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button></div></div>
   <div class="container">
     <div id="noDataBanner" class="no-data-banner hidden"><strong>📭 Henüz veri yüklenmemiş</strong><br>Admin kullanıcısı tarafından veri yüklenmesi gerekmektedir.</div>
     <div id="dashboardContent">
@@ -252,13 +257,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
         <div class="filter-group"><label>Yıllar Seçiniz</label><select id="fYil" multiple></select><div class="multi-select" data-select="fYil"></div></div>
         <div class="hidden"><select id="cmpY1"></select><select id="cmpY2"></select></div>
         <div class="filter-group"><label>Bölge</label><select id="fBolge" multiple></select><div class="multi-select" data-select="fBolge"></div></div>
+         <div class="filter-group"><label>Ürün Grubu</label><select id="fUrun" multiple></select><div class="multi-select" data-select="fUrun"></div><span class="product-hint" id="productHint"></span></div>
         <div class="filter-group"><label></label> Alt Grup<select id="fUrunGrubu" multiple></select><div class="multi-select" data-select="fUrunGrubu"></div></div>
-        <div class="filter-group"><label>BBG ve Katı</label><select id="fUrun" multiple></select><div class="multi-select" data-select="fUrun"></div><span class="product-hint" id="productHint"></span></div>
+        <div class="filter-group"><label>Ürün Adı</label><select id="fUrunAdi" multiple></select><div class="multi-select" data-select="fUrunAdi"></div></div>
         <div class="filter-group"><label>Yönetici</label><select id="fYonetici" multiple></select><div class="multi-select" data-select="fYonetici"></div></div>
         <div class="filter-group"><label>İl</label><select id="fIl" multiple></select><div class="multi-select" data-select="fIl"></div></div>
         <div class="filter-group"><label>Ay</label><select id="fAy" multiple></select><div class="multi-select" data-select="fAy"></div></div>
         <div class="filter-group"><label>TKK Bölge</label><select id="fTKK" multiple></select><div class="multi-select" data-select="fTKK"></div></div>
-        <button class="btn btn-sm btn-secondary" onclick="resetFilters()">Temizle</button>
+<div class="filter-group"><label>Cari Hesap Adı</label><select id="fCari" multiple></select><div class="multi-select" data-select="fCari"></div></div>
+<div class="filter-group"><label>Dağıtım Kanalı</label><select id="fDagitimKanali" multiple></select><div class="multi-select" data-select="fDagitimKanali"></div></div>
+<div class="filter-group"><label>Kooperatif Adı</label><select id="fKooperatif" multiple></select><div class="multi-select" data-select="fKooperatif"></div></div>
+
+<button class="btn btn-sm btn-secondary" onclick="resetFilters()">Temizle</button>
       </div>
       <div id="budgetPageContent" class="hidden">
         <div class="budget-page-head">
@@ -269,9 +279,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
           <button class="btn btn-sm btn-secondary" onclick="renderBudgetRealizationPage()">↻ Yenile</button>
         </div>
         <div class="budget-kpi-grid" id="budgetKpiGrid"></div>
-        <div class="budget-list-card"><div id="budgetManagerPage"></div></div>
         <div class="budget-list-card"><div id="budgetRegionPage"></div></div>
         <div class="budget-list-card"><div id="budgetProductPage"></div></div>
+        <div class="budget-list-card"><div id="budgetManagerPage"></div></div>
         <div class="budget-list-card"><div id="budgetIlPage"></div></div>
       </div>
 
@@ -282,6 +292,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
         </div>
         <div class="budget-kpi-grid" id="balanceKpiGrid"></div>
         <div class="budget-list-card"><div id="balanceReportPage"></div></div>
+      </div>
+      <div id="consumptionPageContent" class="hidden">
+        <div class="budget-page-head">
+          <div>
+            <div class="budget-page-title">🌾 GÜBRETAŞ Tüketim Analizi</div>
+            <div id="consumptionFilterInfo" class="budget-page-subtitle"></div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="renderConsumptionPage()">↻ Yenile</button>
+        </div>
+        <div class="budget-kpi-grid" id="consumptionKpiGrid"></div>
+        <div class="budget-list-card"><div id="consumptionRegionPage"></div></div>
+        <div class="budget-list-card"><div id="consumptionTkkPage"></div></div>
+        <div class="budget-list-card"><div id="consumptionIlPage"></div></div>
       </div>
       <div id="kpiArea" class="kpi-area"></div>
       <div class="chart-grid">
@@ -307,86 +330,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 <script>
 const USERS = { admin: '2503', satis: '1453', BatiAkdeniz: '0707', DoguAkdeniz: '3232',Ege: '3535', GAP: '0202', 'GenelMud.Ihracat': '3434', 'GenelMud.YurtiIci': '3434', GuneydoguAnadolu: '2121', IcAnadolu: '0606', Karadeniz: '5555', Marmara: '3434' };
 const REGION_USERS = { BatiAkdeniz:'Batı Akdeniz', DoguAkdeniz:'Doğu Akdeniz', Ege:'Ege', GAP:'GAP', 'GenelMud.Ihracat':'Genel Müd. İhracat', 'GenelMud.YurtiIci':'Genel Müd. Yurtiçi', GuneydoguAnadolu:'Güneydoğu Anadolu', IcAnadolu:'İç Anadolu', Karadeniz:'Karadeniz', Marmara:'Marmara' };
-const HEADERS = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge'];
-
-function parseLocalizedNumber(value) {
-    if (typeof value === 'number') {
-        return Number.isFinite(value) ? value : 0;
-    }
-
-    if (value === null || value === undefined || value === '') {
-        return 0;
-    }
-
-    let s = String(value)
-        .trim()
-        .replace(/[\s\u00A0\u202F₺$€£]/g, '');
-
-    if (!s || s === '-' || s === '—') return 0;
-
-    // Negatif değer kontrolü
-    const isNegative = /^\(.*\)$/.test(s) || s.startsWith('-');
-
-    s = s.replace(/[()]/g, '');
-    s = s.replace(/[^\d.,+-]/g, '');
-
-    if (!s) return 0;
-
-    const comma = s.lastIndexOf(',');
-    const dot = s.lastIndexOf('.');
-
-    if (comma >= 0 && dot >= 0) {
-        // 1.250,50 => 1250.50
-        // 1,250.50 => 1250.50
-        if (comma > dot) {
-            s = s.replace(/\./g, '').replace(',', '.');
-        } else {
-            s = s.replace(/,/g, '');
-        }
-    }
-    else if (comma >= 0) {
-        const decimals = s.length - comma - 1;
-        const commas = (s.match(/,/g) || []).length;
-
-        if (commas > 1 || decimals === 3) {
-            s = s.replace(/,/g, '');
-        } else {
-            s = s.replace(',', '.');
-        }
-    }
-    else if (dot >= 0) {
-        const decimals = s.length - dot - 1;
-        const dots = (s.match(/\./g) || []).length;
-
-        if (dots > 1 || decimals === 3) {
-            s = s.replace(/\./g, '');
-        }
-    }
-
-    const n = Number(s);
-
-    if (!Number.isFinite(n)) return 0;
-
-    return isNegative ? -Math.abs(n) : n;
-}
-
-function normalizeImportedRow(row) {
-  const out = {};
-  for (const [rawKey, value] of Object.entries(row || {})) out[String(rawKey).replace(/^\uFEFF/, '').trim()] = value;
-  const aliases = {
-    'YIL':'Yıl','BOLGE':'Bölge','IL':'İl','AY':'Ay','YONETICI':'Yönetici','YÖNETİCİ':'Yönetici',
-    'BÜTÇE':'Bütçe','BUTCE':'Bütçe','SATIŞ':'Satış','SATIS':'Satış','ÜRÜN':'Ürün','URUN':'Ürün',
-    'ÜRÜN ADI':'Ürün Adı','URUN ADI':'Ürün Adı','ÜRÜN GRUBU':'Ürün Grubu','URUN GRUBU':'Ürün Grubu',
-    'TKK BÖLGE':'TKK Bölge','TKK BOLGE':'TKK Bölge','SEVK':'Sevk','SEVKİYAT':'Sevk',
-    'SİPARİŞ':'Sipariş','SIPARIS':'Sipariş','BAKİYE':'Bakiye','BAKIYE':'Bakiye'
-  };
-  for (const key of Object.keys(out)) {
-    const canonical = aliases[key.toLocaleUpperCase('tr-TR')];
-    if (canonical && canonical !== key && (out[canonical] === undefined || out[canonical] === '')) out[canonical] = out[key];
-  }
-  return out;
-}
-
+const HEADERS = [
+  'Yıl', 'Bölge', 'Ürün', 'İl', 'Ay', 'Yönetici', 'Bütçe', 'Satış',
+  'Ürün Adı', 'Ürün Grubu', 'TKK Bölge', 'Bakiye', 'Sipariş',
+  'Cari Hesap Adı', 'Dağıtım Kanalı'
+];
 const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const DB_NAME = 'SalesDashboardDB', DB_VERSION = 1, STORE_NAME = 'salesData';
 let currentUser = null, currentRegion = null, data = [], db = null;
@@ -402,42 +350,73 @@ function initDB() {
     };
   });
 }
-async function saveData() {
-  if (!db) { const ok = await initDB(); if (!ok) return false; }
-  return new Promise((resolve) => {
+const DB_BATCH_SIZE = 5000;
+
+function idbRequest(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB işlem hatası'));
+  });
+}
+
+async function saveDataChunk(prefix, index, rows) {
+  return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction([STORE_NAME], 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      store.put(data, 'records');
-      tx.oncomplete = () => { console.log('IndexedDB kayıt:', data.length); resolve(true); };
-      tx.onerror = () => { console.error('IndexedDB kayıt hatası'); resolve(false); };
-    } catch(e) { console.error(e); resolve(false); }
+      tx.objectStore(STORE_NAME).put(rows, prefix + '_' + index);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('Parça kaydedilemedi'));
+      tx.onabort = () => reject(tx.error || new Error('Kayıt işlemi iptal edildi'));
+    } catch (e) { reject(e); }
   });
 }
+
+async function commitDataBatches(prefix, batchCount, rowCount) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction([STORE_NAME], 'readwrite');
+      tx.objectStore(STORE_NAME).put({
+        prefix: prefix, batchCount: batchCount, rowCount: rowCount,
+        updatedAt: new Date().toISOString()
+      }, 'records_meta');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('Veri bilgisi kaydedilemedi'));
+      tx.onabort = () => reject(tx.error || new Error('Veri bilgisi kaydı iptal edildi'));
+    } catch (e) { reject(e); }
+  });
+}
+
 async function loadData() {
   if (!db) { const ok = await initDB(); if (!ok) return; }
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction([STORE_NAME], 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get('records');
-      req.onsuccess = () => {
-        if (req.result) { data = req.result; console.log('IndexedDB yükleme:', data.length); }
-        else { console.log('IndexedDB boş, bellek:', data.length); }
-        resolve();
-      };
-      req.onerror = () => { console.error('IndexedDB okuma hatası'); resolve(); };
-    } catch(e) { console.error(e); resolve(); }
-  });
-}
-async function deleteData() {
-  if (!db) return;
-  return new Promise((resolve) => {
-    const tx = db.transaction([STORE_NAME], 'readwrite');
+  try {
+    const tx = db.transaction([STORE_NAME], 'readonly');
     const store = tx.objectStore(STORE_NAME);
-    store.delete('records');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
+    const meta = await idbRequest(store.get('records_meta'));
+    if (meta && meta.prefix && meta.batchCount) {
+      const requests = [];
+      for (let i = 0; i < meta.batchCount; i++) requests.push(idbRequest(store.get(meta.prefix + '_' + i)));
+      const batches = await Promise.all(requests);
+      data = batches.flatMap(x => Array.isArray(x) ? x : []);
+      console.log('IndexedDB parça yükleme:', data.length);
+    } else {
+      const legacy = await idbRequest(store.get('records'));
+      data = Array.isArray(legacy) ? legacy : [];
+      console.log('IndexedDB eski kayıt yükleme:', data.length);
+    }
+  } catch (e) {
+    console.error('IndexedDB okuma hatası:', e);
+    data = [];
+  }
+}
+
+async function deleteData() {
+  if (!db) { const ok = await initDB(); if (!ok) return; }
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_NAME], 'readwrite');
+    tx.objectStore(STORE_NAME).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error || new Error('Veriler silinemedi'));
+    tx.onabort = () => reject(tx.error || new Error('Silme işlemi iptal edildi'));
   });
 }
 
@@ -457,19 +436,29 @@ async function doLogin() {
   currentUser = u;
   currentRegion = REGION_USERS[u] || null;
   document.getElementById('loginView').classList.add('hidden');
-  
   if (u === 'admin') {
     document.getElementById('adminView').classList.remove('hidden');
     document.getElementById('satisView').classList.add('hidden');
-    if (!data.length) await fetchGoogleSheetData(); // Veri zaten yüklüyse üzerine yazma
+    const synced = await fetchGoogleSheetData();
+    if (!synced) await loadData();
+    renderPreview();
   } else {
     document.getElementById('satisView').classList.remove('hidden');
     document.getElementById('adminView').classList.add('hidden');
     const titleEl = document.getElementById('salesTopTitle');
     if (titleEl) titleEl.textContent = currentRegion ? '📊 Satış Analiz Dashboard — ' + currentRegion : '📊 Satış Analiz Dashboard';
-    
-    // Satış kullanıcısı girince doğrudan Google Sheets'ten canlı veri çek
-    if (!data.length) await fetchGoogleSheetData();
+    const synced = await fetchGoogleSheetData();
+    if (!synced) await loadData();
+    console.log('Satış girişi - Veri sayısı:', data.length);
+    if (data.length === 0) {
+      document.getElementById('noDataBanner').classList.remove('hidden');
+      document.getElementById('dashboardContent').classList.add('hidden');
+    } else {
+      document.getElementById('noDataBanner').classList.add('hidden');
+      document.getElementById('dashboardContent').classList.remove('hidden');
+      initFilters();
+      renderDashboard();
+    }
   }
 }
 function logout() {
@@ -496,104 +485,254 @@ function msg(id, text, type) {
   setTimeout(() => el.textContent = '', 6000);
 }
 
+function updateUploadProgress(percent, text) {
+  const wrap = document.getElementById('uploadProgressWrap');
+  const bar = document.getElementById('uploadProgressBar');
+  const label = document.getElementById('uploadProgressText');
+  if (wrap) wrap.classList.remove('hidden');
+  if (bar) {
+    const p = Math.max(0, Math.min(100, Math.round(percent)));
+    bar.style.width = p + '%';
+    bar.textContent = p + '%';
+  }
+  if (label) label.textContent = text || '';
+}
+
+function parseLocalizedNumber(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  let s = String(value).trim().replace(/[₺\s]/g, '');
+  if (!s || s === '-') return 0;
+  const negative = /^\(.*\)$/.test(s);
+  s = s.replace(/[()]/g, '').replace(/[^0-9,.-]/g, '');
+  if (!s) return 0;
+  const comma = s.lastIndexOf(',');
+  const dot = s.lastIndexOf('.');
+  if (comma !== -1 && dot !== -1) {
+    if (comma > dot) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+  } else if (comma !== -1) {
+    const decimals = s.length - comma - 1;
+    s = decimals > 0 && decimals <= 2 ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (dot !== -1) {
+    const parts = s.split('.');
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) s = parts.join('');
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? (negative ? -n : n) : 0;
+}
+
+function normalizeUploadRow(r) {
+  r['Bütçe'] = parseLocalizedNumber(r['Bütçe']);
+  r['Satış'] = parseLocalizedNumber(r['Satış']);
+  r['Sevk'] = parseLocalizedNumber(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat']);
+  r['Sipariş'] = parseLocalizedNumber(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS']);
+  r['Bakiye'] = parseLocalizedNumber(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE']);
+  r['Yıl'] = parseInt(r['Yıl'], 10) || 0;
+  // Pazarlama Tüketim Miktarı sütunları (opsiyonel): başlık yazımı farklı olsa da tanınır.
+  const qk = ['TÜKETİM MİKTARI','Tüketim Miktarı','TÜKETIM MIKTARI','Tüketim Miktari','TUKETIM MIKTARI'].find(k => r[k] !== undefined);
+  if (qk !== undefined) {
+    const n = parseLocalizedNumber(r[qk]);
+    if (qk !== 'TÜKETİM MİKTARI') delete r[qk];
+    r['TÜKETİM MİKTARI'] = isFinite(n) ? n : 0;
+  }
+  const kk = ['KOOPERATİF ADI','Kooperatif Adı','KOOPERATIF ADI','Kooperatif Adi'].find(k => r[k] !== undefined);
+  if (kk !== undefined) {
+    const v = String(r[kk] ?? '').trim();
+    if (kk !== 'KOOPERATİF ADI') delete r[kk];
+    r['KOOPERATİF ADI'] = v;
+  }
+  return r;
+}
+
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1entxGH1kWhdF0IudnpUwJjmIDORRK1dKKVjWv4CLA1M/gviz/tq?gid=1319335015&tqx=out:csv';
+
+async function fetchGoogleSheetData() {
+  const newPrefix = 'records_gsheet_' + Date.now();
+  let batchCount = 0;
+  let rowCount = 0;
+  try {
+    if (!db) {
+      const ok = await initDB();
+      if (!ok) throw new Error('Tarayıcı veri alanı açılamadı.');
+    }
+    console.log('Google Sheets verisi alınıyor...');
+    const response = await fetch(GOOGLE_SHEET_CSV_URL, { method: 'GET', cache: 'no-store' });
+    if (!response.ok) throw new Error('Google Sheets HTTP ' + response.status);
+    const csvText = await response.text();
+    if (!csvText || /<\s*html/i.test(csvText.slice(0, 500))) {
+      throw new Error('Google Sheets CSV verisi alınamadı. Paylaşım ve bağlantıyı kontrol edin.');
+    }
+    const workbook = XLSX.read(csvText, { type: 'string', raw: true, dense: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet || !sheet['!ref']) throw new Error('Google Sheets sayfasında veri bulunamadı.');
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false, raw: true });
+    const headers = (matrix.shift() || []).map(h => String(h ?? '').trim());
+    const required = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge','Bakiye','Sipariş','Cari Hesap Adı','Dağıtım Kanalı'];
+    const missing = required.filter(h => !headers.includes(h));
+    if (missing.length) throw new Error('Google Sheets sayfasında eksik sütun başlığı: ' + missing.join(', '));
+    if (!matrix.length) throw new Error('Google Sheets sayfasında yüklenecek satır yok.');
+
+    for (let start = 0; start < matrix.length; start += DB_BATCH_SIZE) {
+      const part = matrix.slice(start, start + DB_BATCH_SIZE);
+      const rows = part.map(values => {
+        const row = {};
+        headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
+        return normalizeUploadRow(row);
+      });
+      await saveDataChunk(newPrefix, batchCount, rows);
+      rowCount += rows.length;
+      batchCount++;
+      console.log('Google Sheets kayıt:', rowCount, '/', matrix.length);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    if (!rowCount) throw new Error('Google Sheets verisinden kayıt oluşturulamadı.');
+
+    // Yeni veri tamamen yazıldıktan sonra aktif veri kümesini değiştir.
+    await commitDataBatches(newPrefix, batchCount, rowCount);
+
+    // Eski Excel/Google Sheets parçalarını temizle; yeni veri ve meta kaydı korunur.
+    const keyTx = db.transaction([STORE_NAME], 'readonly');
+    const keys = await idbRequest(keyTx.objectStore(STORE_NAME).getAllKeys());
+    const oldKeys = keys.filter(k => k === 'records' ||
+      (typeof k === 'string' && k.startsWith('records_') &&
+       k !== 'records_meta' && !k.startsWith(newPrefix + '_')));
+    if (oldKeys.length) {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        oldKeys.forEach(k => store.delete(k));
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Eski veriler temizlenemedi.'));
+      });
+    }
+    await loadData();
+    console.log('Google Sheets senkronizasyonu tamamlandı:', data.length, 'kayıt');
+    return true;
+  } catch (err) {
+    console.error('Google Sheets bağlantı hatası:', err);
+    // Başarısız senkronizasyonda önceki kayıtları koru, yalnızca yarım kalan yeni parçaları sil.
+    try {
+      if (db) {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const keys = await idbRequest(store.getAllKeys());
+        keys.filter(k => typeof k === 'string' && k.startsWith(newPrefix + '_')).forEach(k => store.delete(k));
+      }
+    } catch (cleanupError) { console.warn('Geçici Google Sheets kayıtları temizlenemedi:', cleanupError); }
+    return false;
+  }
+}
+
 async function handleFile(file) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    try {
-      const buffer = e.target.result;
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
-      const rows = rawRows.map(normalizeImportedRow);
-      let invalidBudget = 0, invalidSales = 0;
-      rows.forEach(r => {
-        const bRaw = r['Bütçe'], sRaw = r['Satış'];
-        r['Bütçe'] = parseLocalizedNumber(bRaw);
-        r['Satış'] = parseLocalizedNumber(sRaw);
-        r['Sevk'] = parseLocalizedNumber(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat'] ?? 0);
-        r['Sipariş'] = parseLocalizedNumber(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS'] ?? 0);
-        r['Bakiye'] = parseLocalizedNumber(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE'] ?? 0);
-        r['Yıl'] = parseInt(String(r['Yıl'] ?? '').trim(), 10) || 0;
-        if (bRaw !== '' && bRaw !== null && bRaw !== undefined && r['Bütçe'] === 0 && String(bRaw).trim() !== '0') invalidBudget++;
-        if (sRaw !== '' && sRaw !== null && sRaw !== undefined && r['Satış'] === 0 && String(sRaw).trim() !== '0') invalidSales++;
-      });
-      data = rows;
-      const totalBudget = rows.reduce((sum, r) => sum + (Number(r['Bütçe']) || 0), 0);
-      const totalSales = rows.reduce((sum, r) => sum + (Number(r['Satış']) || 0), 0);
-      const saved = await saveData();
-      const summary = `${rows.length.toLocaleString('tr-TR')} kayıt | Bütçe: ${fmt(totalBudget)} | Satış: ${fmt(totalSales)}`;
-      msg("uploadMsg", summary + (saved ? " — kaydedildi" : " — KAYIT BAŞARISIZ") +
-        ((invalidBudget || invalidSales) ? ` | Kontrol: Bütçe ${invalidBudget}, Satış ${invalidSales} şüpheli hücre` : ""), saved ? "ok" : "err");
-      renderPreview();
-      if (!document.getElementById('satisView').classList.contains('hidden')) {
-        initFilters(); renderDashboard();
-      }
-    } catch (err) {
-      msg("uploadMsg", "Hata: " + err.message, "err");
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-// Google Sheets'ten veriyi otomatik çeken fonksiyon
-// Google Sheets'ten veriyi otomatik çeken güncel fonksiyon
-// Google Sheets / Drive'dan doğrudan .xlsx formatında canlı veri çeken fonksiyon
-async function fetchGoogleSheetData() {
-  // Google Sheets tablosunu doğrudan .xlsx olarak indirme/çekme adresi
-  const sheetUrl = 'https://docs.google.com/spreadsheets/d/1entxGH1kWhdF0IudnpUwJjmIDORRK1dKKVjWv4CLA1M/export?format=xlsx';
-  const msgEl = document.getElementById("uploadMsg");
-  
+  const input = document.getElementById('fileInput');
+  if (input) input.disabled = true;
+  document.getElementById('uploadMsg').textContent = '';
+  updateUploadProgress(0, 'Dosya okunuyor: ' + file.name);
+
+  const newPrefix = 'records_' + Date.now();
+  let batchCount = 0;
+  let rowCount = 0;
+
   try {
-    const response = await fetch(sheetUrl);
-    if (!response.ok) throw new Error('Google E-Tabloya erişilemedi! Bağlantı izinlerini kontrol edin.');
-    
-    // Excel dosyasını binary (arrayBuffer) olarak okuyoruz
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    
-    // İlk sayfayı alıp JSON objesine çeviriyoruz
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
-    
-    const rows = rawRows.map(normalizeImportedRow);
-    
-    if (rows && rows.length > 0) {
-      rows.forEach(r => {
-        r['Bütçe'] = parseLocalizedNumber(r['Bütçe']);
-        r['Satış'] = parseLocalizedNumber(r['Satış']);
-        r['Sevk'] = parseLocalizedNumber(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat'] ?? 0);
-        r['Sipariş'] = parseLocalizedNumber(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS'] ?? 0);
-        r['Bakiye'] = parseLocalizedNumber(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE'] ?? 0);
-        r['Yıl'] = parseInt(String(r['Yıl'] ?? '').trim(), 10) || 0;
+    if (!db) {
+      const ok = await initDB();
+      if (!ok) throw new Error('Tarayıcı veri alanı açılamadı.');
+    }
+
+    const buffer = await file.arrayBuffer();
+    updateUploadProgress(2, 'Excel dosyası açılıyor...');
+    const workbook = XLSX.read(buffer, { type: 'array', dense: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet || !sheet['!ref']) throw new Error('Excel sayfasında okunabilir veri bulunamadı.');
+
+    const range = XLSX.utils.decode_range(sheet['!ref']);
+    const headerRows = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      range: { s: { r: range.s.r, c: range.s.c }, e: { r: range.s.r, c: range.e.c } },
+      blankrows: false, defval: ''
+    });
+    const headers = (headerRows[0] || []).map(h => String(h).trim());
+    const required = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge','Bakiye','Sipariş','Cari Hesap Adı','Dağıtım Kanalı'];
+    const missing = required.filter(h => !headers.includes(h));
+    if (missing.length) throw new Error('Eksik sütun başlığı: ' + missing.join(', '));
+    if (!headers.length) throw new Error('Excel başlık satırı okunamadı.');
+
+    const firstDataRow = range.s.r + 1;
+    const totalSheetRows = Math.max(0, range.e.r - firstDataRow + 1);
+    if (!totalSheetRows) throw new Error('Başlık dışında yüklenecek satır bulunamadı.');
+
+    for (let startRow = firstDataRow; startRow <= range.e.r; startRow += DB_BATCH_SIZE) {
+      const endRow = Math.min(range.e.r, startRow + DB_BATCH_SIZE - 1);
+      const chunk = XLSX.utils.sheet_to_json(sheet, {
+        header: headers,
+        range: { s: { r: startRow, c: range.s.c }, e: { r: endRow, c: range.e.c } },
+        defval: '', blankrows: false
       });
-      
-      data = rows;
-      await saveData(); // Çekilen veriyi IndexedDB hafızasına kaydet
-      console.log("Excel (.xlsx) üzerinden başarıyla çekilen kayıt sayısı:", data.length);
-      
-      if (msgEl) msg("uploadMsg", data.length + " kayıt Excel'den (.xlsx) başarıyla güncellendi", "ok");
-      
-      const noDataBanner = document.getElementById('noDataBanner');
-      if (noDataBanner) noDataBanner.classList.add('hidden');
-      const dashboardContent = document.getElementById('dashboardContent');
-      if (dashboardContent) dashboardContent.classList.remove('hidden');
-      
-      renderPreview();
+      if (chunk.length) {
+        chunk.forEach(normalizeUploadRow);
+        await saveDataChunk(newPrefix, batchCount, chunk);
+        rowCount += chunk.length;
+        batchCount++;
+      }
+      const processed = endRow - firstDataRow + 1;
+      updateUploadProgress(5 + (processed / totalSheetRows) * 90,
+        fmt(processed) + ' / ' + fmt(totalSheetRows) + ' satır tarandı — ' + fmt(rowCount) + ' kayıt kaydedildi');
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    if (!rowCount) throw new Error('Excel dosyasında yüklenecek kayıt bulunamadı.');
+
+    // Yeni veri eksiksiz yazıldıktan sonra aktif veri kümesini değiştir.
+    await commitDataBatches(newPrefix, batchCount, rowCount);
+
+    // Önceki sürümün tek parça kaydını ve eski parça kümelerini temizle.
+    const keysTx = db.transaction([STORE_NAME], 'readonly');
+    const keys = await idbRequest(keysTx.objectStore(STORE_NAME).getAllKeys());
+    const oldKeys = keys.filter(k => k === 'records' ||
+      (typeof k === 'string' && k.startsWith('records_') &&
+       k !== 'records_meta' && !k.startsWith(newPrefix + '_')));
+    if (oldKeys.length) {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        oldKeys.forEach(k => store.delete(k));
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Eski kayıtlar temizlenemedi'));
+      });
+    }
+
+    // Mevcut dashboard fonksiyonları data dizisini kullanmaya devam eder.
+    const readTx = db.transaction([STORE_NAME], 'readonly');
+    const readStore = readTx.objectStore(STORE_NAME);
+    const batchReads = [];
+    for (let i = 0; i < batchCount; i++) batchReads.push(idbRequest(readStore.get(newPrefix + '_' + i)));
+    data = (await Promise.all(batchReads)).flatMap(x => Array.isArray(x) ? x : []);
+
+    updateUploadProgress(100, fmt(rowCount) + ' kayıt başarıyla yüklendi.');
+    msg('uploadMsg', fmt(rowCount) + ' kayıt parça parça kaydedildi ve kullanıma hazır.', 'ok');
+    renderPreview();
+    if (!document.getElementById('satisView').classList.contains('hidden')) {
       initFilters();
       renderDashboard();
     }
   } catch (err) {
-    console.error("Excel veri çekme hatası:", err);
-    if (msgEl) msg("uploadMsg", "Excel verisi çekilemedi: " + err.message, "err");
+    console.error('Dosya yükleme hatası:', err);
+    // Yarım kalan parçaları sil; önceki aktif veri kümesi korunur.
+    try {
+      const tx = db.transaction([STORE_NAME], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const keys = await idbRequest(store.getAllKeys());
+      const partial = keys.filter(k => typeof k === 'string' && k.startsWith(newPrefix + '_'));
+      partial.forEach(k => store.delete(k));
+    } catch (cleanupError) { console.warn('Geçici kayıt temizliği:', cleanupError); }
+    updateUploadProgress(0, 'Yükleme tamamlanamadı.');
+    msg('uploadMsg', 'Yükleme hatası: ' + (err && err.message ? err.message : err), 'err');
+  } finally {
+    if (input) input.disabled = false;
   }
 }
-// Sayfa ilk yüklendiğinde otomatik çalıştır
-window.addEventListener('DOMContentLoaded', async () => {
-  await loadData();
-  if (!data.length) await fetchGoogleSheetData();
-});
-
 
 const dropZone = document.getElementById('dropZone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -602,13 +741,15 @@ dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.
 
 async function clearData() {
   if (!confirm('Tüm veriler silinecek. Emin misiniz?')) return;
-  data = [];
-  await deleteData();
-  msg('uploadMsg', 'Tüm veriler silindi', 'ok');
-  renderPreview();
-  if (!document.getElementById('satisView').classList.contains('hidden')) {
-    initFilters(); renderDashboard();
-  }
+  try {
+    data = [];
+    await deleteData();
+    msg('uploadMsg', 'Tüm veriler silindi', 'ok');
+    renderPreview();
+    if (!document.getElementById('satisView').classList.contains('hidden')) {
+      initFilters(); renderDashboard();
+    }
+  } catch (e) { msg('uploadMsg', 'Silme hatası: ' + e.message, 'err'); }
 }
 
 function renderPreview() {
@@ -691,7 +832,7 @@ function initFilters() {
   setOpts('fUrun', unique('Ürün'));
   updateProductOptions();
   setOpts('fUrunGrubu', unique('Ürün Grubu'));
-  
+  setOpts('fUrunAdi', unique('Ürün Adı'));
   setOpts('fIl', unique('İl'));
   const aySirasi = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
   const ayNormalize = (v) => {
@@ -718,6 +859,9 @@ function initFilters() {
   setOpts('fAy', [...aylarSirali, ...aylarDiger].map(a => String(a).toLocaleUpperCase('tr-TR')));
   setOpts('fYonetici', unique('Yönetici'));
   setOpts('fTKK', unique('TKK Bölge'));
+  setOpts('fCari', unique('Cari Hesap Adı'));
+setOpts('fDagitimKanali', unique('Dağıtım Kanalı'));
+  setOpts('fKooperatif', unique('KOOPERATİF ADI'));
 
   const yillar = unique('Yıl').map(String).sort((a,b)=>Number(a)-Number(b));
   const setCmp = (id) => { document.getElementById(id).innerHTML = yillar.map(y => '<option value="' + y + '">' + y + '</option>').join(''); };
@@ -738,9 +882,10 @@ function initFilters() {
 function syncComparisonYearsFromFilter(shouldRender=true){
   const years=getSelectedValues('fYil').map(String).filter(Boolean).sort((a,b)=>Number(a)-Number(b));
   const all=unique('Yıl').map(String).sort((a,b)=>Number(a)-Number(b));
-  const ys=years.length?years:all;
+  // Seçili yıllardan yalnızca en güncel iki yılı karşılaştırma özetine al.
+  const ys=(years.length?years:all).slice(-2);
   const y1=ys.length>=2?ys[0]:(ys[0]||'');
-  const y2=ys.length>=2?ys[ys.length-1]:(ys[0]||'');
+  const y2=ys.length>=2?ys[1]:(ys[0]||'');
   const c1=document.getElementById('cmpY1'), c2=document.getElementById('cmpY2');
   if(c1)c1.value=y1; if(c2)c2.value=y2;
   if(shouldRender) renderDashboard();
@@ -749,9 +894,15 @@ function syncComparisonYearsFromFilter(shouldRender=true){
 function syncYearsToFilter(){ syncComparisonYearsFromFilter(true); }
 
 function resetFilters() {
-  ['fYil','fBolge','fUrun','fUrunGrubu','fIl','fAy','fYonetici','fTKK'].forEach(id => {
-    Array.from(document.getElementById(id).options).forEach(o => o.selected = false);
+  ['fYil','fBolge','fUrun','fUrunGrubu','fUrunAdi','fIl','fAy','fYonetici','fTKK','fCari','fDagitimKanali','fKooperatif'].forEach(id => {
+    const sel=document.getElementById(id);
+    if(sel) Array.from(sel.options).forEach(o => o.selected = false);
   });
+  // Bölge hesabında bölge filtresi kilitli kalır; temizle işlemi başka bölgelere erişim açmaz.
+  if(currentRegion){
+    const regionSelect=document.getElementById('fBolge');
+    if(regionSelect) Array.from(regionSelect.options).forEach(o=>o.selected=String(o.value).trim()===String(currentRegion).trim());
+  }
   const ys=unique('Yıl').map(String).sort((a,b)=>Number(a)-Number(b));
   const yilSel=document.getElementById('fYil');
   if(ys.length>=2){
@@ -763,27 +914,61 @@ function resetFilters() {
   refreshAllMultiSelects();
 }
 
+function matchesCariKanal(r) {
+  const cariler = getSelectedValues('fCari');
+  const kanallar = getSelectedValues('fDagitimKanali');
+
+  const cari = String(r['Cari Hesap Adı'] ?? '').trim();
+  const kanal = String(r['Dağıtım Kanalı'] ?? '').trim();
+
+  return (
+    (cariler.length === 0 || cariler.includes(cari)) &&
+    (kanallar.length === 0 || kanallar.includes(kanal))
+  );
+}
+
+/* ===== ORTAK FİLTRE VE YIL YARDIMCILARI ===== */
+const FILTER_FIELDS=[['fBolge','Bölge'],['fUrunGrubu','Ürün Grubu'],['fUrun','Ürün'],['fUrunAdi','Ürün Adı'],['fIl','İl'],['fAy','Ay'],['fYonetici','Yönetici'],['fTKK','TKK Bölge'],['fCari','Cari Hesap Adı'],['fDagitimKanali','Dağıtım Kanalı'],['fKooperatif','KOOPERATİF ADI']];
+const AY_NORM_MAP={'OCAK':'OCAK','1':'OCAK','01':'OCAK','ŞUBAT':'ŞUBAT','SUBAT':'ŞUBAT','2':'ŞUBAT','02':'ŞUBAT','MART':'MART','3':'MART','03':'MART','NİSAN':'NİSAN','NISAN':'NİSAN','4':'NİSAN','04':'NİSAN','MAYIS':'MAYIS','5':'MAYIS','05':'MAYIS','HAZİRAN':'HAZİRAN','HAZIRAN':'HAZİRAN','6':'HAZİRAN','06':'HAZİRAN','TEMMUZ':'TEMMUZ','7':'TEMMUZ','07':'TEMMUZ','AĞUSTOS':'AĞUSTOS','AGUSTOS':'AĞUSTOS','8':'AĞUSTOS','08':'AĞUSTOS','EYLÜL':'EYLÜL','EYLUL':'EYLÜL','9':'EYLÜL','09':'EYLÜL','EKİM':'EKİM','EKIM':'EKİM','10':'EKİM','KASIM':'KASIM','11':'KASIM','ARALIK':'ARALIK','12':'ARALIK'};
+function normAy(v){const t=String(v??'').trim();const u=t.toLocaleUpperCase('tr-TR');return AY_NORM_MAP[u]||AY_NORM_MAP[t]||u;}
+/* Yıl hariç TÜM filtreleri (bölge kilidi dahil) uygulayan tek eşleştirici. */
+function buildRowMatcher(only){
+  const fields=only?FILTER_FIELDS.filter(([id])=>only.includes(id)):FILTER_FIELDS;
+  const sel={};
+  fields.forEach(([id,k])=>{
+    const el=document.getElementById(id); if(!el){sel[k]=null;return;}
+    let v=getSelectedValues(id).map(x=>String(x).trim());
+    if(k==='Ay') v=v.map(normAy);
+    sel[k]=v.length?new Set(v):null;
+  });
+  const region=currentRegion?String(currentRegion).trim():null;
+  return r=>{
+    if(region && String(r['Bölge']??'').trim()!==region) return false;
+    for(const [,k] of fields){
+      const s=sel[k]; if(!s) continue;
+      let x=String(r[k]??'').trim(); if(k==='Ay') x=normAy(x);
+      if(!s.has(x)) return false;
+    }
+    return true;
+  };
+}
+/* Seçilen yıllardan yalnızca EN GÜNCEL İKİ yıl (ilk-son değil). Seçim yoksa veri setinin son iki yılı. */
+function getSelectedYearsAll(){
+  let ys=getSelectedValues('fYil').map(String).filter(Boolean);
+  if(!ys.length) ys=[...new Set(data.map(r=>String(r['Yıl']??'').trim()).filter(Boolean))];
+  return [...new Set(ys)].sort((a,b)=>Number(a)-Number(b));
+}
+function getTableYears(){
+  let ys=getSelectedValues('fYil').map(String).filter(Boolean);
+  if(!ys.length) ys=[...new Set(data.map(r=>String(r['Yıl']??'').trim()).filter(Boolean))];
+  ys=[...new Set(ys)].sort((a,b)=>Number(a)-Number(b));
+  return ys.slice(-2);
+}
+
 function getFiltered() {
   const yillar = getSelectedValues('fYil');
-  const bolgeler = getSelectedValues('fBolge');
-   const urunler = getSelectedValues('fUrun');
-  const urunGruplari = getSelectedValues('fUrunGrubu');
- 
-  const iller = getSelectedValues('fIl');
-  const aylar = getSelectedValues('fAy');
-  const yoneticiler = getSelectedValues('fYonetici');
-  const tkkler = getSelectedValues('fTKK');
-  return data.filter(r => {
-    return (yillar.length === 0 || yillar.includes(String(r['Yıl']))) &&
-           (!currentRegion || String(r['Bölge']).trim() === String(currentRegion).trim()) &&
-           (bolgeler.length === 0 || bolgeler.includes(r['Bölge'])) &&
-           (urunGruplari.length === 0 || urunGruplari.includes(r['Ürün Grubu'])) &&
-           (urunler.length===0 || urunler.includes(r['Ürün'])) &&
-           (iller.length === 0 || iller.includes(r['İl'])) &&
-           (aylar.length === 0 || aylar.includes(r['Ay'])) &&
-           (yoneticiler.length === 0 || yoneticiler.includes(r['Yönetici'])) &&
-           (tkkler.length === 0 || tkkler.includes(r['TKK Bölge']));
-  });
+  const match = buildRowMatcher();
+  return data.filter(r => (yillar.length === 0 || yillar.includes(String(r['Yıl']))) && match(r));
 }
 
 function renderDashboard() {
@@ -807,13 +992,7 @@ function renderKpis(yilFiltre){
   const area=document.getElementById('kpiArea');
   let years=yilFiltre.length?yilFiltre.map(String):unique('Yıl').map(String);
   years=years.filter(Boolean).sort((a,b)=>Number(a)-Number(b));
-  const nonYear=(r)=> (getSelectedValues('fBolge').length===0||getSelectedValues('fBolge').includes(r['Bölge'])) &&
-    (getSelectedValues('fUrunGrubu').length===0||getSelectedValues('fUrunGrubu').includes(r['Ürün Grubu'])) &&
-    (getSelectedValues('fUrun').length===0||getSelectedValues('fUrun').includes(r['Ürün'])) &&
-    (getSelectedValues('fIl').length===0||getSelectedValues('fIl').includes(r['İl'])) &&
-    (getSelectedValues('fAy').length===0||getSelectedValues('fAy').includes(r['Ay'])) &&
-    (getSelectedValues('fYonetici').length===0||getSelectedValues('fYonetici').includes(r['Yönetici'])) &&
-    (getSelectedValues('fTKK').length===0||getSelectedValues('fTKK').includes(r['TKK Bölge']));
+  const nonYear=buildRowMatcher();
   const selectedGroups=getSelectedValues('fUrunGrubu').map(v=>String(v).toLocaleLowerCase('tr-TR'));
   const hasKati=selectedGroups.some(v=>v.includes('katı')||v.includes('kati'));
   const hasBbg=selectedGroups.some(v=>v.includes('bbg')||v.includes('bitki besleme'));
@@ -828,7 +1007,7 @@ function renderKpis(yilFiltre){
       <div class="kpi"><div class="kpi-label">Yüzde Gerçekleşme</div><div class="kpi-value ${o>=100?'kpi-gercek-positive':'kpi-gercek-negative'}">%${fmt1(o)}</div><div class="kpi-sub">Satış / Bütçe</div></div></div>`;
   }).join('');
   if(years.length >= 2){
-    const y1=years[0], y2=years[years.length-1];
+    const y1=years[years.length-2], y2=years[years.length-1];
     const r1=data.filter(r=>String(r['Yıl'])===y1&&nonYear(r));
     const r2=data.filter(r=>String(r['Yıl'])===y2&&nonYear(r));
     const b1=r1.reduce((s,r)=>s+(Number(r['Bütçe'])||0),0);
@@ -941,14 +1120,7 @@ function drawMonthlyYearCompare(rows, years){
     return;
   }
 
-  const match=r=>
-    (getSelectedValues('fBolge').length===0||getSelectedValues('fBolge').includes(r['Bölge'])) &&
-    (getSelectedValues('fUrunGrubu').length===0||getSelectedValues('fUrunGrubu').includes(r['Ürün Grubu'])) &&
-    (getSelectedValues('fUrun').length===0||getSelectedValues('fUrun').includes(r['Ürün'])) &&
-    (getSelectedValues('fIl').length===0||getSelectedValues('fIl').includes(r['İl'])) &&
-    (getSelectedValues('fAy').length===0||getSelectedValues('fAy').includes(r['Ay'])) &&
-    (getSelectedValues('fYonetici').length===0||getSelectedValues('fYonetici').includes(r['Yönetici'])) &&
-    (getSelectedValues('fTKK').length===0||getSelectedValues('fTKK').includes(r['TKK Bölge']));
+  const match=buildRowMatcher();
 
   const chartColors=['#5470C6','#91CC75','#FAC858','#EE6666','#73C0DE','#3BA272','#FC8452','#9A60B4','#EA7CCC'];
   const series=ys.map((y,idx)=>{
@@ -1016,20 +1188,14 @@ function drawProductGroupCompare(){
 
   const bolge=getSelectedValues('fBolge');
   const urunGrubu=getSelectedValues('fUrunGrubu');
+  const urunAdi=getSelectedValues('fUrunAdi');
   const urun=getSelectedValues('fUrun');
   const il=getSelectedValues('fIl');
   const ay=getSelectedValues('fAy');
   const yonetici=getSelectedValues('fYonetici');
   const tkk=getSelectedValues('fTKK');
 
-  const match=r =>
-    (bolge.length===0 || bolge.includes(r['Bölge'])) &&
-    (urunGrubu.length===0 || urunGrubu.includes(r['Ürün Grubu'])) &&
-    (urun.length===0 || urun.includes(r['Ürün'])) &&
-    (il.length===0 || il.includes(r['İl'])) &&
-    (ay.length===0 || ay.includes(r['Ay'])) &&
-    (yonetici.length===0 || yonetici.includes(r['Yönetici'])) &&
-    (tkk.length===0 || tkk.includes(r['TKK Bölge']));
+  const match=buildRowMatcher();
 
   const grouped=years.map(y=>({
     year:y,
@@ -1093,7 +1259,7 @@ function drawCompareChart(){
   const c=chartInit('chartKarsilastirma');
   const leg=document.getElementById('chartKarsilastirmaLegend');
   if(!years.length){c.setOption({});leg.innerHTML='';return;}
-  const match=r=>(getSelectedValues('fBolge').length===0||getSelectedValues('fBolge').includes(r['Bölge']))&&(getSelectedValues('fUrunGrubu').length===0||getSelectedValues('fUrunGrubu').includes(r['Ürün Grubu']))&&(getSelectedValues('fUrun').length===0||getSelectedValues('fUrun').includes(r['Ürün']))&&(getSelectedValues('fIl').length===0||getSelectedValues('fIl').includes(r['İl']))&&(getSelectedValues('fAy').length===0||getSelectedValues('fAy').includes(r['Ay']))&&(getSelectedValues('fYonetici').length===0||getSelectedValues('fYonetici').includes(r['Yönetici']))&&(getSelectedValues('fTKK').length===0||getSelectedValues('fTKK').includes(r['TKK Bölge']));
+  const match=buildRowMatcher();
   const positions=['top','bottom'];
   const chartColors=['#5470C6','#91CC75','#FAC858','#EE6666','#73C0DE','#3BA272','#FC8452','#9A60B4','#EA7CCC'];
   const series=years.map((y,i)=>{
@@ -1142,14 +1308,7 @@ function drawTKKCompare(){
     return;
   }
 
-  const match=r=>
-    (getSelectedValues('fBolge').length===0||getSelectedValues('fBolge').includes(r['Bölge'])) &&
-    (getSelectedValues('fUrunGrubu').length===0||getSelectedValues('fUrunGrubu').includes(r['Ürün Grubu'])) &&
-    (getSelectedValues('fUrun').length===0||getSelectedValues('fUrun').includes(r['Ürün'])) &&
-    (getSelectedValues('fIl').length===0||getSelectedValues('fIl').includes(r['İl'])) &&
-    (getSelectedValues('fAy').length===0||getSelectedValues('fAy').includes(r['Ay'])) &&
-    (getSelectedValues('fYonetici').length===0||getSelectedValues('fYonetici').includes(r['Yönetici'])) &&
-    (getSelectedValues('fTKK').length===0||getSelectedValues('fTKK').includes(r['TKK Bölge']));
+  const match=buildRowMatcher();
 
   const grouped=years.map(y=>({
     year:y,
@@ -1172,6 +1331,10 @@ function drawTKKCompare(){
     label:{
       show:true,
       position:'top',
+      rotate:-90,
+      align:'right',
+      verticalAlign:'middle',
+      distance:6,
       fontSize:10,
       fontWeight:'600',
       formatter:p=>fmt(Math.round(p.value))
@@ -1205,7 +1368,7 @@ grid:{
       data:cats,
       axisLabel:{interval:0,rotate:cats.length>5?28:0,fontSize:12,fontWeight:'600',margin:14,hideOverlap:false}
     },
-    yAxis:{type:'value',axisLabel:{formatter:v=>fmt(Math.round(v))}},
+    yAxis:{type:'value',boundaryGap:[0,'25%'],axisLabel:{formatter:v=>fmt(Math.round(v))}},
     series
   });
   leg.innerHTML='';
@@ -1213,28 +1376,19 @@ grid:{
 
 function drawSummaryTable(){
   const el=document.getElementById('chartOzet');
-  const y1=document.getElementById('cmpY1').value, y2=document.getElementById('cmpY2').value;
-  if(!y1||!y2){el.innerHTML='<div style="padding:20px;color:#98a2b3">İki yıl seçiniz.</div>';return;}
-  
-  const match=r=>
-    (!currentRegion || String(r['Bölge']).trim() === String(currentRegion).trim()) &&
-    (getSelectedValues('fBolge').length===0||getSelectedValues('fBolge').includes(r['Bölge'])) &&
-    (getSelectedValues('fUrunGrubu').length===0||getSelectedValues('fUrunGrubu').includes(r['Ürün Grubu'])) &&
-    (getSelectedValues('fUrun').length===0||getSelectedValues('fUrun').includes(r['Ürün'])) &&
-    (getSelectedValues('fIl').length===0||getSelectedValues('fIl').includes(r['İl'])) &&
-    (getSelectedValues('fAy').length===0||getSelectedValues('fAy').includes(r['Ay'])) &&
-    (getSelectedValues('fYonetici').length===0||getSelectedValues('fYonetici').includes(r['Yönetici'])) &&
-    (getSelectedValues('fTKK').length===0||getSelectedValues('fTKK').includes(r['TKK Bölge']));
-  
-  const rows1=data.filter(r=>String(r['Yıl'])===y1&&match(r));
-  const rows2=data.filter(r=>String(r['Yıl'])===y2&&match(r));
-  const a=groupSum(rows1,'Bölge','Satış'), b=groupSum(rows2,'Bölge','Satış');
-  const cats=[...new Set([...a.map(x=>x[0]),...b.map(x=>x[0])])];
-  const ma=Object.fromEntries(a), mb=Object.fromEntries(b);
-  let html='<div class="summary-table-wrap"><table><thead><tr><th>Bölge</th><th>'+y1+' Satış</th><th>'+y2+' Satış</th><th>Fark</th><th>% Gerçekleşme</th></tr></thead><tbody>';
+  const years=getSelectedYearsAll();
+  if(!years.length){el.innerHTML='<div style="padding:20px;color:#98a2b3">Yıl seçiniz.</div>';return;}
+  const match=buildRowMatcher();
+  const rowsAll=data.filter(r=>years.includes(String(r['Yıl']??'').trim())&&match(r));
+  const per={};years.forEach(y=>{per[y]=Object.fromEntries(groupSum(rowsAll.filter(r=>String(r['Yıl']).trim()===y),'Bölge','Satış'));});
+  const cats=[...new Set(rowsAll.map(r=>r['Bölge']||'Diğer'))];
+  const last=years[years.length-1], prev=years.length>1?years[years.length-2]:years[0];
+  const cmp=years.length>1;
+  let html='<div class="summary-table-wrap"><table><thead><tr><th>Bölge</th>'+years.map(y=>'<th>'+y+' Satış</th>').join('')+(cmp?'<th>Fark ('+prev+'→'+last+')</th><th>% Fark</th>':'')+'</tr></thead><tbody>';
+  cats.sort((a,b)=>years.reduce((s,y)=>s+(per[y][b]||0),0)-years.reduce((s,y)=>s+(per[y][a]||0),0));
   cats.forEach(k=>{
-    const s1=ma[k]||0,s2=mb[k]||0,f=s2-s1,o=s1?s2/s1*100:0;
-    html+=`<tr><td><b>${k}</b></td><td>${fmt(Math.round(s1))}</td><td>${fmt(Math.round(s2))}</td><td style="color:${f>=0?'#16a34a':'#ef4444'}">${fmt(Math.round(f))}</td><td style="color:${o>=100?'#16a34a':'#f59e0b'}">%${fmt1(o)}</td></tr>`;
+    const s1=per[prev][k]||0,s2=per[last][k]||0,f=s2-s1,o=s1?f/s1*100:0,nw=!s1&&s2>0;
+    html+='<tr><td><b>'+k+'</b></td>'+years.map(y=>'<td data-v="'+(per[y][k]||0)+'">'+fmt(Math.round(per[y][k]||0))+'</td>').join('')+(cmp?'<td data-v="'+f+'" style="color:'+(f>=0?'#16a34a':'#ef4444')+'">'+fmt(Math.round(f))+'</td><td data-v="'+(nw?1e12:o)+'" style="color:'+(o>=0?'#16a34a':'#ef4444')+'">'+(nw?'Yeni':(o>=0?'+':'')+fmt1(o)+'%')+'</td>':'')+'</tr>';
   });
   html+='</tbody></table></div>';el.innerHTML=html;
   makeSortableTable(el.querySelector('table'));
@@ -1271,6 +1425,7 @@ function drawYoneticiKarsilastirma(){
 
   const bolge = getSelectedValues('fBolge');
   const urunGrubu = getSelectedValues('fUrunGrubu');
+  const urunAdi=getSelectedValues('fUrunAdi');
   const urun = getSelectedValues('fUrun');
   const il = getSelectedValues('fIl');
   const ay = getSelectedValues('fAy');
@@ -1288,8 +1443,10 @@ function drawYoneticiKarsilastirma(){
     const yil = String(r['Yıl'] ?? '').trim();
 
     return (yil === y1 || yil === y2) &&
+      (!currentRegion || String(r['Bölge'] ?? '').trim() === String(currentRegion).trim()) &&
       (bolge.length === 0 || bolge.includes(String(r['Bölge'] ?? '').trim())) &&
-      (urunGrubu.length === 0 || urunGrubu.includes(String(r['Ürün Adı'] ?? '').trim())) &&
+      (urunGrubu.length === 0 || urunGrubu.includes(String(r['Ürün Grubu'] ?? '').trim())) &&
+      (urunAdi.length === 0 || urunAdi.includes(String(r['Ürün Adı'] ?? '').trim())) &&
       (urun.length === 0 || urun.includes(String(r['Ürün'] ?? '').trim())) &&
       (il.length === 0 || il.includes(String(r['İl'] ?? '').trim())) &&
       (ay.length === 0 || ay.includes(String(r['Ay'] ?? '').trim())) &&
@@ -1406,6 +1563,7 @@ function drawUrunAdiKarsilastirma(){
 
   const bolge=getSelectedValues('fBolge');
   const urunGrubu=getSelectedValues('fUrunGrubu');
+  const urunAdi=getSelectedValues('fUrunAdi');
   const urun=getSelectedValues('fUrun');
   const il=getSelectedValues('fIl');
   const ay=getSelectedValues('fAy');
@@ -1415,8 +1573,10 @@ function drawUrunAdiKarsilastirma(){
   const rows=data.filter(r=>{
     const yil=String(r['Yıl']??'').trim();
     return (yil===y1||yil===y2) &&
+      (!currentRegion || String(r['Bölge']??'').trim()===String(currentRegion).trim()) &&
       (bolge.length===0||bolge.includes(String(r['Bölge']??'').trim())) &&
-      (urunGrubu.length===0||urunGrubu.includes(String(r['Ürün Adı']??'').trim())) &&
+      (urunGrubu.length===0||urunGrubu.includes(String(r['Ürün Grubu']??'').trim())) &&
+      (urunAdi.length===0||urunAdi.includes(String(r['Ürün Adı']??'').trim())) &&
       (urun.length===0||urun.includes(String(r['Ürün']??'').trim())) &&
       (il.length===0||il.includes(String(r['İl']??'').trim())) &&
       (ay.length===0||ay.includes(String(r['Ay']??'').trim())) &&
@@ -1478,26 +1638,45 @@ function drawUrunAdiKarsilastirma(){
 
 
 <script>
-function sortDashboardTable(table, colIndex, numeric){
+function _cellSortVal(cell){
+  if(!cell) return null;
+  if(cell.dataset && cell.dataset.v!==undefined && cell.dataset.v!==''){const n=Number(cell.dataset.v);return isNaN(n)?null:n;}
+  const t=(cell.innerText||'').trim().replace(/[−–]/g,'-');
+  if(!/^[%+\-\s]*\d[\d.,\s]*\s*%?$/.test(t)) return null;
+  const n=Number(t.replace(/[%+\s]/g,'').replace(/\./g,'').replace(/,/g,'.'));
+  return isNaN(n)?null:n;
+}
+function sortDashboardTable(table, colIndex){
   if(!table || !table.tBodies.length) return;
   const tbody=table.tBodies[0];
   const rows=Array.from(tbody.querySelectorAll('tr'));
   const key=colIndex;
-  const state=table.dataset.sortState || '';
-  const asc=state!==String(key)+':asc';
-  rows.sort((a,b)=>{
-    const av=(a.cells[colIndex]?.innerText||'').trim();
-    const bv=(b.cells[colIndex]?.innerText||'').trim();
+  // TOPLAM satırları sıralamaya katılmaz; her zaman en altta kalır.
+  const totalRows=rows.filter(r=>r.classList.contains('budget-total')||r.classList.contains('manager-total')||/^\s*TOPLAM/i.test(r.cells[0]?.innerText||''));
+  const detailRows=rows.filter(r=>!totalRows.includes(r) && r.cells.length>1);
+  const emptyRows=rows.filter(r=>!totalRows.includes(r)&&!detailRows.includes(r));
+  // Sütun sayısal mı? (boş / "-" hücreler hariç tüm hücreler sayıysa)
+  const vals=detailRows.map(r=>r.cells[colIndex]);
+  const filled=vals.filter(c=>{const t=(c?.innerText||'').trim();return t!==''&&t!=='-'&&t!=='—';});
+  const numeric=filled.length>0 && filled.every(c=>_cellSortVal(c)!==null);
+  const state=table.dataset.sortState||'';
+  // Sayısal sütunlarda ilk tık: büyükten küçüğe. Metinde: A→Z. Aynı sütuna tekrar tıklayınca yön değişir.
+  let dir;
+  if(state.startsWith(key+':')) dir=state.endsWith(':asc')?'desc':'asc';
+  else dir=numeric?'desc':'asc';
+  const asc=dir==='asc';
+  detailRows.sort((a,b)=>{
     if(numeric){
-      const parse=v=>Number(v.replace(/\./g,'').replace(/,/g,'.').replace(/%/g,''))||0;
-      return asc ? parse(av)-parse(bv) : parse(bv)-parse(av);
+      const av=_cellSortVal(a.cells[colIndex]), bv=_cellSortVal(b.cells[colIndex]);
+      const x=av===null?-Infinity:av, y=bv===null?-Infinity:bv;
+      if(x===y) return 0;
+      return asc ? (x<y?-1:1) : (x<y?1:-1);
     }
-    return asc ? av.localeCompare(bv,'tr',{numeric:true,sensitivity:'base'})
-               : bv.localeCompare(av,'tr',{numeric:true,sensitivity:'base'});
+    const av=(a.cells[colIndex]?.innerText||'').trim(), bv=(b.cells[colIndex]?.innerText||'').trim();
+    return asc ? av.localeCompare(bv,'tr',{numeric:true,sensitivity:'base'}) : bv.localeCompare(av,'tr',{numeric:true,sensitivity:'base'});
   });
-  rows.forEach(r=>tbody.appendChild(r));
-  table.dataset.sortState=String(key)+(asc?':asc':':desc');
-
+  [...detailRows,...emptyRows,...totalRows].forEach(r=>tbody.appendChild(r));
+  table.dataset.sortState=key+':'+(asc?'asc':'desc');
   table.querySelectorAll('th .sort-indicator').forEach(x=>x.textContent='');
   const th=table.tHead?.rows[0]?.cells[colIndex];
   if(th){
@@ -1508,12 +1687,23 @@ function sortDashboardTable(table, colIndex, numeric){
 }
 function makeSortableTable(table){
   if(!table || !table.tHead) return;
-  Array.from(table.tHead.rows[0].cells).forEach((th,i)=>{
+  Array.from(table.tHead.rows[0].cells).forEach(th=>{
     if(th.dataset.sortReady) return;
     th.dataset.sortReady='1';
     const label=th.innerText;
     th.innerHTML=label+' <span class="sort-indicator"></span>';
-    th.onclick=()=>sortDashboardTable(table,i,[1,2,3,4,5,6,7].includes(i));
+    th.style.cursor='pointer';
+  });
+}
+/* Tek noktadan tıklama: modalda kopyalanan tablolar dahil tüm sıralanabilir tablolar çalışır */
+if(!window.__sortDelegated){
+  window.__sortDelegated=true;
+  document.addEventListener('click',e=>{
+    const th=e.target.closest&&e.target.closest('th');
+    if(!th||!th.dataset.sortReady) return;
+    const table=th.closest('table');
+    if(!table||!table.tHead||!table.tHead.contains(th)) return;
+    sortDashboardTable(table,th.cellIndex);
   });
 }
 </script>
@@ -1537,36 +1727,23 @@ function makeSortableTable(table){
 </div>
 <script>
 (function(){
-  function yearsSelected(){
-    let ys=getSelectedValues('fYil').map(String).filter(Boolean).sort((a,b)=>Number(a)-Number(b));
-    if(!ys.length){ ys=[...new Set(data.map(r=>String(r['Yıl']??'').trim()).filter(Boolean))].sort((a,b)=>Number(a)-Number(b)); }
-    return ys;
-  }
+  function yearsSelected(){ return getSelectedYearsAll(); }
   function filterRowsForTables(years){
-    const bolge=getSelectedValues('fBolge'), urunGrubu=getSelectedValues('fUrunGrubu'), urun=getSelectedValues('fUrun'), il=getSelectedValues('fIl'), ay=getSelectedValues('fAy'), yonetici=getSelectedValues('fYonetici'), tkk=getSelectedValues('fTKK');
-    return data.filter(r=>{
-      const yil=String(r['Yıl']??'').trim();
-      return years.includes(yil) &&
-        (!bolge.length||bolge.includes(String(r['Bölge']??'').trim())) &&
-        (!urunGrubu.length||urunGrubu.includes(String(r['Ürün Adı']??'').trim())) &&
-        (!urun.length||urun.includes(String(r['Ürün']??'').trim())) &&
-        (!il.length||il.includes(String(r['İl']??'').trim())) &&
-        (!ay.length||ay.includes(String(r['Ay']??'').trim())) &&
-        (!yonetici.length||yonetici.includes(String(r['Yönetici']??'').trim())) &&
-        (!tkk.length||tkk.includes(String(r['TKK Bölge']??'').trim()));
-    });
+    const match=buildRowMatcher();
+    return data.filter(r=>years.includes(String(r['Yıl']??'').trim()) && match(r));
   }
   function nfmt(v){return typeof fmt==='function'?fmt(Math.round(v)):Math.round(v).toLocaleString('tr-TR')}
-  function pfmt(v){return Math.round(v)+'%'}
+  function pfmt(v){return v.toLocaleString('tr-TR',{maximumFractionDigits:1})+'%'}
   function makeCompareTable(el,title,key,years,rows){
     if(!el)return;
     const map={};
     rows.forEach(r=>{const name=String(r[key]??'').trim();if(!name)return;(map[name]??={}).__name=name; const y=String(r['Yıl']??'').trim(); if(!map[name][y])map[name][y]=0; map[name][y]+=Number(r['Satış'])||0;});
-    const first=years[0],last=years[years.length-1];
-    const list=Object.values(map).map(v=>{const vals=years.map(y=>v[y]||0);const fark=(v[last]||0)-(v[first]||0);const pct=(v[first]||0)?fark/(v[first]||0)*100:((v[last]||0)?100:0);return {name:v.__name,vals,fark,pct};}).filter(x=>x.vals.some(v=>v!==0)).sort((a,b)=>b.vals.reduce((s,v)=>s+v,0)-a.vals.reduce((s,v)=>s+v,0));
+    const last=years[years.length-1], first=years.length>1?years[years.length-2]:years[0];
+    const list=Object.values(map).map(v=>{const vals=years.map(y=>v[y]||0);const fark=(v[last]||0)-(v[first]||0);const pct=(v[first]||0)?fark/(v[first]||0)*100:0;const isNew=!(v[first]||0)&&(v[last]||0)>0;return {name:v.__name,vals,fark,pct,isNew};}).filter(x=>x.vals.some(v=>v!==0)).sort((a,b)=>((b.vals[years.length-1]||0)+(b.vals[years.length>1?years.length-2:0]||0))-((a.vals[years.length-1]||0)+(a.vals[years.length>1?years.length-2:0]||0)));
     const totals=years.map((y,i)=>list.reduce((s,x)=>s+x.vals[i],0));
-    const tf=(totals[totals.length-1]||0)-(totals[0]||0), tp=(totals[0]||0)?tf/totals[0]*100:((totals[totals.length-1]||0)?100:0);
-    el.innerHTML=`<div style="font-size:15px;font-weight:700;color:#1d2939;margin:0 0 8px">${title}</div><div style="font-size:12px;color:#98a2b3;margin-bottom:10px">Seçilen yıllara göre kümülatif karşılaştırma</div><table class="manager-compare-table"><thead><tr><th>${title}</th>${years.map(y=>`<th>${y} Satış</th>`).join('')}<th>Fark</th><th>% Fark</th></tr></thead><tbody>${list.map(x=>`<tr><td>${x.name}</td>${x.vals.map(v=>`<td>${nfmt(v)}</td>`).join('')}<td class="${x.fark>=0?'manager-fark-positive':'manager-fark-negative'}">${nfmt(x.fark)}</td><td class="${x.pct>=0?'manager-yuzde-positive':'manager-yuzde-negative'}">${pfmt(x.pct)}</td></tr>`).join('')}${list.length?`<tr class="manager-total"><td>TOPLAM KÜMÜLATİF</td>${totals.map(v=>`<td>${nfmt(v)}</td>`).join('')}<td class="${tf>=0?'manager-fark-positive':'manager-fark-negative'}">${nfmt(tf)}</td><td class="${tp>=0?'manager-yuzde-positive':'manager-yuzde-negative'}">${pfmt(tp)}</td></tr>`:''}${list.length?'':`<tr><td colspan="${years.length+3}" style="text-align:center;color:#98a2b3">Veri bulunamadı.</td></tr>`}</tbody></table>`;
+    const _fi=years.length>1?years.length-2:0, _la=years.length-1;
+    const tf=(totals[_la]||0)-(totals[_fi]||0), tp=(totals[_fi]||0)?tf/totals[_fi]*100:0;
+    el.innerHTML=`<div style="font-size:15px;font-weight:700;color:#1d2939;margin:0 0 8px">${title}</div><div style="font-size:12px;color:#98a2b3;margin-bottom:10px">Seçilen tüm yıllar gösterilir; fark ve % fark son iki yıl arasında hesaplanır</div><table class="manager-compare-table"><thead><tr><th>${title}</th>${years.map(y=>`<th>${y} Satış</th>`).join('')}<th>Fark (${first}→${last})</th><th>% Fark</th></tr></thead><tbody>${list.map(x=>`<tr><td>${x.name}</td>${x.vals.map(v=>`<td data-v="${v}">${nfmt(v)}</td>`).join('')}<td data-v="${x.fark}" class="${x.fark>=0?'manager-fark-positive':'manager-fark-negative'}">${nfmt(x.fark)}</td><td data-v="${x.isNew?1e12:x.pct}" class="${x.pct>=0?'manager-yuzde-positive':'manager-yuzde-negative'}">${x.isNew?'Yeni':pfmt(x.pct)}</td></tr>`).join('')}${list.length?`<tr class="manager-total"><td>TOPLAM KÜMÜLATİF</td>${totals.map(v=>`<td>${nfmt(v)}</td>`).join('')}<td class="${tf>=0?'manager-fark-positive':'manager-fark-negative'}">${nfmt(tf)}</td><td class="${tp>=0?'manager-yuzde-positive':'manager-yuzde-negative'}">${pfmt(tp)}</td></tr>`:''}${list.length?'':`<tr><td colspan="${years.length+3}" style="text-align:center;color:#98a2b3">Veri bulunamadı.</td></tr>`}</tbody></table>`;
     const table=el.querySelector('table'); if(table&&typeof makeSortableTable==='function')makeSortableTable(table);
   }
   window.drawUrunAdiKarsilastirma=function(){const ys=yearsSelected();const rows=filterRowsForTables(ys);makeCompareTable(document.getElementById('urunAdiKarsilastirma'),'Ürün Adları','Ürün Adı',ys,rows);};
@@ -1574,46 +1751,38 @@ function makeSortableTable(table){
   window.drawYoneticiKarsilastirma=function(){const ys=yearsSelected();const rows=filterRowsForTables(ys);makeCompareTable(document.getElementById('yoneticiKarsilastirma'),'Satış Yöneticileri','Yönetici',ys,rows);};
   const oldRender=window.renderDashboard;
   if(typeof oldRender==='function'){
-    window.renderDashboard=function(){const r=oldRender.apply(this,arguments);setTimeout(()=>{drawYoneticiKarsilastirma();drawUrunAdiKarsilastirma();drawIlKarsilastirma();},0);return r;};
+    window.renderDashboard=function(){const r=oldRender.apply(this,arguments);setTimeout(()=>{drawYoneticiKarsilastirma();drawUrunAdiKarsilastirma();drawIlKarsilastirma();const bp=document.getElementById('budgetPageContent'),sp=document.getElementById('balancePageContent');if(bp&&!bp.classList.contains('hidden')&&typeof renderBudgetRealizationPage==='function')renderBudgetRealizationPage();if(sp&&!sp.classList.contains('hidden')&&typeof renderSalesBalancePage==='function')renderSalesBalancePage();const cp=document.getElementById('consumptionPageContent');if(cp&&!cp.classList.contains('hidden'))renderConsumptionPage();},0);return r;};
   }
-  function openChart(card){
-    const wrap=card.querySelector('.chart-wrap');if(!wrap)return;
+  function openChart(card,isBudgetCard=false){
+    const wrap=card.querySelector('.chart-wrap');
     const modal=document.getElementById('chartModal'), target=document.getElementById('chartModalChart'), title=document.getElementById('chartModalTitle');
-    title.textContent=card.querySelector('.chart-title')?.textContent||'Grafik';
+    title.textContent=card.querySelector('.chart-title')?.textContent||card.querySelector('.budget-list-title')?.textContent||'Rapor';
     modal.classList.add('open');modal.setAttribute('aria-hidden','false');
     const old=echarts.getInstanceByDom(target);if(old)old.dispose();
-    const inst=echarts.getInstanceByDom(wrap);
+    const inst=wrap&&echarts.getInstanceByDom(wrap);
     if(inst){
       target.innerHTML='';
       const big=echarts.init(target);big.setOption(inst.getOption(),true);setTimeout(()=>big.resize(),30);modal.dataset.chart='echarts';
     }else{
-      // Seçili Yılların Özeti gibi HTML tablo kartlarını da modalda büyüt
-      target.innerHTML='<div class="chart-modal-table-wrap">'+wrap.innerHTML+'</div>';
+      // HTML özet ve Bütçe Gerçekleşme tablolarını geniş modalda göster.
+      const content=isBudgetCard?card.innerHTML:(wrap?wrap.innerHTML:card.innerHTML);
+      target.innerHTML='<div class="chart-modal-table-wrap">'+content+'</div>';
+      const clonedTable=target.querySelector('table');
+      if(clonedTable&&typeof makeSortableTable==='function')makeSortableTable(clonedTable);
       modal.dataset.chart='html';
     }
   }
-  document.addEventListener('click',e=>{const card=e.target.closest('.chart-card');if(card&&card.querySelector('.chart-wrap')&&!e.target.closest('table')&&!e.target.closest('button')&&!e.target.closest('select'))openChart(card);const modal=document.getElementById('chartModal');if(e.target===modal||e.target.closest('.chart-modal-close')){modal.classList.remove('open');modal.setAttribute('aria-hidden','true');const target=document.getElementById('chartModalChart');const inst=echarts.getInstanceByDom(target);if(inst)inst.dispose();}});
+  document.addEventListener('click',e=>{const budgetCard=e.target.closest('.budget-list-card');if(budgetCard&&!e.target.closest('table')&&!e.target.closest('button')&&!e.target.closest('select')){openChart(budgetCard,true);return;}const card=e.target.closest('.chart-card');if(card&&card.querySelector('.chart-wrap')&&!e.target.closest('table')&&!e.target.closest('button')&&!e.target.closest('select'))openChart(card);const modal=document.getElementById('chartModal');if(e.target===modal||e.target.closest('.chart-modal-close')){modal.classList.remove('open');modal.setAttribute('aria-hidden','true');const target=document.getElementById('chartModalChart');const inst=echarts.getInstanceByDom(target);if(inst)inst.dispose();}});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){const modal=document.getElementById('chartModal');if(modal){modal.classList.remove('open');modal.setAttribute('aria-hidden','true');const target=document.getElementById('chartModalChart');const inst=echarts.getInstanceByDom(target);if(inst)inst.dispose();}}});
 })();
 </script>
 
 <script>
-function budgetYears(){
-  let ys=getSelectedValues('fYil').map(String).filter(Boolean);
-  if(!ys.length) ys=[...new Set(data.map(r=>String(r['Yıl']??'').trim()).filter(Boolean))];
-  return ys.sort((a,b)=>Number(a)-Number(b));
-}
+function budgetYears(){ return getSelectedYearsAll(); }
 function budgetFilteredRows(){
   const ys=budgetYears();
-  const filters={
-    'Bölge':getSelectedValues('fBolge'),'Ürün Grubu':getSelectedValues('fUrunGrubu'),'Ürün':getSelectedValues('fUrun'),
-    'İl':getSelectedValues('fIl'),'Ay':getSelectedValues('fAy'),'Yönetici':getSelectedValues('fYonetici'),'TKK Bölge':getSelectedValues('fTKK')
-  };
-  return data.filter(r=>{
-    const y=String(r['Yıl']??'').trim();
-    if(!ys.includes(y)) return false;
-    return Object.entries(filters).every(([k,v])=>!v.length||v.includes(String(r[k]??'').trim()));
-  });
+  const match=buildRowMatcher();
+  return data.filter(r=>ys.includes(String(r['Yıl']??'').trim()) && match(r));
 }
 function budgetTable(targetId,title,key,rows,years){
   const el=document.getElementById(targetId); if(!el)return;
@@ -1626,19 +1795,19 @@ function budgetTable(targetId,title,key,rows,years){
     map[name][y].b += Number(r['Bütçe'])||0;
     map[name][y].s += Number(r['Satış'])||0;
   });
-  const first=years[0],last=years[years.length-1];
+  const last=years[years.length-1], first=years.length>1?years[years.length-2]:years[0];
   const list=Object.values(map).map(x=>{
     const bFirst=x[first]?.b||0,sFirst=x[first]?.s||0,sLast=x[last]?.s||0;
-    const sf=sLast-sFirst,pct=sFirst?sf/sFirst*100:(sLast?100:0);
-    return {x,bFirst,sFirst,sLast,sf,pct};
+    const sf=sLast-sFirst,pct=sFirst?sf/sFirst*100:0,isNew=!sFirst&&sLast>0;
+    return {x,bFirst,sFirst,sLast,sf,pct,isNew};
   }).filter(z=>years.some(y=>(z.x[y]?.b||0)!==0||(z.x[y]?.s||0)!==0))
     .sort((a,b)=>(b.x[last]?.s||0)+(b.x[first]?.s||0)-((a.x[last]?.s||0)+(a.x[first]?.s||0)));
   const headers=years.map(y=>`<th>${y} Bütçe</th><th>${y} Gerçekleşme</th><th>${y} Gerçekleşme %</th>`).join('');
-  const body=list.map(z=>`<tr><td>${z.x.name}</td>${years.map(y=>{const b=z.x[y]?.b||0,s=z.x[y]?.s||0,p=b?s/b*100:0;return `<td>${fmt(b)}</td><td>${fmt(s)}</td><td class="${p>=100?'budget-positive':'budget-negative'}">%${fmt1(p)}</td>`}).join('')}<td class="${z.sf>=0?'budget-positive':'budget-negative'}">${fmt(z.sf)}</td><td class="${z.pct>=0?'budget-positive':'budget-negative'}">${z.pct>=0?'+':''}${fmt1(z.pct)}%</td></tr>`).join('');
+  const body=list.map(z=>`<tr><td>${z.x.name}</td>${years.map(y=>{const b=z.x[y]?.b||0,s=z.x[y]?.s||0,p=b?s/b*100:0;return `<td data-v="${b}">${fmt(b)}</td><td data-v="${s}">${fmt(s)}</td><td data-v="${p}" class="${p>=100?'budget-positive':'budget-negative'}">%${fmt1(p)}</td>`}).join('')}<td data-v="${z.sf}" class="${z.sf>=0?'budget-positive':'budget-negative'}">${fmt(z.sf)}</td><td data-v="${z.isNew?1e12:z.pct}" class="${z.pct>=0?'budget-positive':'budget-negative'}">${z.isNew?'Yeni':(z.pct>=0?'+':'')+fmt1(z.pct)+'%'}</td></tr>`).join('');
   const totals=years.map(y=>({b:list.reduce((a,z)=>a+(z.x[y]?.b||0),0),s:list.reduce((a,z)=>a+(z.x[y]?.s||0),0)}));
-  const totalSF=(totals.at(-1)?.s||0)-(totals[0]?.s||0), totalPct=(totals[0]?.s||0)?totalSF/totals[0].s*100:((totals.at(-1)?.s||0)?100:0);
+  const _fi=years.length>1?years.length-2:0, totalSF=(totals.at(-1)?.s||0)-(totals[_fi]?.s||0), totalPct=(totals[_fi]?.s||0)?totalSF/totals[_fi].s*100:0;
   const totalCells=totals.map(t=>`<td>${fmt(t.b)}</td><td>${fmt(t.s)}</td><td class="${t.b&&t.s/t.b*100>=100?'budget-positive':'budget-negative'}">%${fmt1(t.b?t.s/t.b*100:0)}</td>`).join('');
-  el.innerHTML=`<div class="budget-list-title">${title}</div><div class="budget-list-subtitle">Seçilen yıllara göre bütçe, gerçekleşme ve gerçekleşme oranı</div><table class="budget-table"><thead><tr><th>${title}</th>${headers}<th>Satış Farkı</th><th>% Fark</th></tr></thead><tbody>${body||`<tr><td colspan="${1+years.length*3+2}" style="text-align:center;color:#98a2b3">Veri bulunamadı.</td></tr>`}${list.length?`<tr class="budget-total"><td>TOPLAM</td>${totalCells}<td class="${totalSF>=0?'budget-positive':'budget-negative'}">${fmt(totalSF)}</td><td class="${totalPct>=0?'budget-positive':'budget-negative'}">${totalPct>=0?'+':''}${fmt1(totalPct)}%</td></tr>`:''}</tbody></table>`;
+  el.innerHTML=`<div class="budget-list-title">${title}</div><div class="budget-list-subtitle">Seçilen tüm yıllar gösterilir; satış farkı son iki yıl arasında hesaplanır</div><table class="budget-table"><thead><tr><th>${title}</th>${headers}<th>Satış Farkı (${first}→${last})</th><th>% Fark</th></tr></thead><tbody>${body||`<tr><td colspan="${1+years.length*3+2}" style="text-align:center;color:#98a2b3">Veri bulunamadı.</td></tr>`}${list.length?`<tr class="budget-total"><td>TOPLAM</td>${totalCells}<td class="${totalSF>=0?'budget-positive':'budget-negative'}">${fmt(totalSF)}</td><td class="${totalPct>=0?'budget-positive':'budget-negative'}">${totalPct>=0?'+':''}${fmt1(totalPct)}%</td></tr>`:''}</tbody></table>`;
   if(typeof makeSortableTable==='function') makeSortableTable(el.querySelector('table'));
 }
 function renderBudgetRealizationPage(){
@@ -1648,9 +1817,9 @@ function renderBudgetRealizationPage(){
   document.getElementById('budgetFilterInfo').textContent=`${years.join(' • ')} | Filtrelenen kayıt: ${fmt(rows.length)}`;
   const totals=years.map(y=>{const rs=rows.filter(r=>String(r['Yıl']).trim()===y);const b=rs.reduce((a,r)=>a+(Number(r['Bütçe'])||0),0),s=rs.reduce((a,r)=>a+(Number(r['Satış'])||0),0);return {y,b,s,p:b?s/b*100:0}});
   document.getElementById('budgetKpiGrid').innerHTML=totals.map(t=>`<div class="kpi"><div class="kpi-label">${t.y} BÜTÇE</div><div class="kpi-value">${fmt(t.b)}</div><div class="kpi-sub">GERÇEKLEŞME: ${fmt(t.s)} — %${fmt1(t.p)}</div></div>`).join('');
-  budgetTable('budgetManagerPage','Satış Yöneticileri','Yönetici',rows,years);
   budgetTable('budgetRegionPage','Bölgeler','Bölge',rows,years);
   budgetTable('budgetProductPage','Ürün Adları','Ürün Adı',rows,years);
+  budgetTable('budgetManagerPage','Satış Yöneticileri','Yönetici',rows,years);
   budgetTable('budgetIlPage','İller','İl',rows,years);
 }
 let currentSalesBalanceExport=[];
@@ -1701,6 +1870,9 @@ function showSalesBalancePage(){
   document.querySelector('#dashboardContent > .chart-grid').classList.add('hidden');
   document.querySelector('#dashboardContent > .chart-card').classList.add('hidden');
   document.getElementById('budgetPageContent').classList.add('hidden');
+  setConsumptionFilterMode(false);
+  document.getElementById('consumptionPageContent').classList.add('hidden');
+  document.getElementById('consumptionPageBtn').classList.add('hidden');
   document.getElementById('balancePageContent').classList.remove('hidden');
   document.getElementById('salesTopTitle').textContent='📊 Satış Bakiye Raporu';
   document.getElementById('budgetPageBtn').classList.add('hidden');
@@ -1713,13 +1885,103 @@ function showBudgetRealizationPage(){
   document.querySelector('#dashboardContent > #kpiArea').classList.add('hidden');
   document.querySelector('#dashboardContent > .chart-grid').classList.add('hidden');
   document.querySelector('#dashboardContent > .chart-card').classList.add('hidden');
+  setConsumptionFilterMode(false);
+  document.getElementById('consumptionPageContent').classList.add('hidden');
   document.getElementById('budgetPageContent').classList.remove('hidden');
   document.getElementById('salesTopTitle').textContent='📋 Bütçe Gerçekleşme';
   document.getElementById('budgetPageBtn').textContent='📊 Dashboard';
   document.getElementById('budgetPageBtn').onclick=showDashboardPage;
   renderBudgetRealizationPage();
 }
+
+/* ===== PAZARLAMA TÜKETİM MİKTARI ===== */
+const CONS_FILTER_IDS=['fYil','fBolge','fUrun','fIl','fTKK','fKooperatif'];
+/* Tüketim ekranında yalnızca Yıl, Bölge, Ürün, İl, TKK Bölge, Kooperatif Adı filtreleri görünür ve uygulanır. */
+function setConsumptionFilterMode(on){
+  FILTER_FIELDS.map(f=>f[0]).concat(['fYil']).forEach(id=>{
+    if(CONS_FILTER_IDS.includes(id)) return;
+    const g=document.getElementById(id)?.closest('.filter-group');
+    if(g) g.classList.toggle('cons-hide',!!on);
+  });
+  const lbl=document.getElementById('fUrun')?.closest('.filter-group')?.querySelector('label');
+  if(lbl){
+    if(on){ if(lbl.dataset.orig===undefined) lbl.dataset.orig=lbl.textContent; lbl.textContent='Ürün'; }
+    else if(lbl.dataset.orig!==undefined){ lbl.textContent=lbl.dataset.orig; delete lbl.dataset.orig; }
+  }
+}
+function consumptionHasData(){ return data.some(r=>r['TÜKETİM MİKTARI']!==undefined); }
+function fmtQ(v){ return Math.round(Number(v||0)).toLocaleString('tr-TR',{maximumFractionDigits:0}); }
+function fmtPQ(v){ return '%'+Math.round(v).toLocaleString('tr-TR',{maximumFractionDigits:0}); }
+function consumptionTable(targetId,title,key,rows,years){
+  const el=document.getElementById(targetId); if(!el)return;
+  const map={};
+  rows.forEach(r=>{
+    const name=String(r[key]??'').trim()||'(Boş)';
+    const y=String(r['Yıl']??'').trim();
+    const m=map[name]||(map[name]={name,q:{},s:{}});
+    m.q[y]=(m.q[y]||0)+(Number(r['TÜKETİM MİKTARI'])||0);
+    m.s[y]=(m.s[y]||0)+(Number(r['Satış'])||0);
+  });
+  // % hesabı yalnızca son iki seçili yıl için: Satış / Tüketim Miktarı
+  const pctYears=years.slice(-2);
+  const last=years[years.length-1], prev=years.length>1?years[years.length-2]:last;
+  const ratio=(sv,qv)=>qv? sv/qv*100 : null;
+  const list=Object.values(map)
+    .filter(m=>years.some(y=>(m.q[y]||0)!==0||(m.s[y]||0)!==0))
+    .sort((p,q)=>((q.q[last]||0)+(q.q[prev]||0))-((p.q[last]||0)+(p.q[prev]||0)));
+  const pctCell=(sv,qv)=>{const p=ratio(sv,qv);return p===null?`<td>-</td>`:`<td data-v="${p}" class="${p>=100?'budget-positive':'budget-negative'}">${fmtPQ(p)}</td>`;};
+  const body=list.map(m=>`<tr><td>${m.name}</td>${years.map(y=>`<td data-v="${m.q[y]||0}">${fmtQ(m.q[y]||0)}</td><td data-v="${m.s[y]||0}">${fmtQ(m.s[y]||0)}</td>`).join('')}${pctYears.map(y=>pctCell(m.s[y]||0,m.q[y]||0)).join('')}</tr>`).join('');
+  const tq=years.map(y=>list.reduce((a,m)=>a+(m.q[y]||0),0));
+  const ts=years.map(y=>list.reduce((a,m)=>a+(m.s[y]||0),0));
+  const colCount=1+years.length*2+pctYears.length;
+  const totalPct=pctYears.map(y=>{const i=years.indexOf(y);const p=ratio(ts[i],tq[i]);return p===null?'<td>-</td>':`<td class="${p>=100?'budget-positive':'budget-negative'}">${fmtPQ(p)}</td>`;}).join('');
+  el.innerHTML=`<div class="budget-list-title">${title}</div><div class="budget-list-subtitle">Seçilen tüm yıllar gösterilir; % = Satış ÷ Tüketim Miktarı (son iki yıl)</div><table class="budget-table"><thead><tr><th>${title}</th>${years.map(y=>`<th>${y} Tüketim Miktarı</th><th>${y} Satış</th>`).join('')}${pctYears.map(y=>`<th>% Fark ${y} (Satış/Tüketim)</th>`).join('')}</tr></thead><tbody>${body||`<tr><td colspan="${colCount}" style="text-align:center;color:#98a2b3">Veri bulunamadı.</td></tr>`}${list.length?`<tr class="budget-total"><td>TOPLAM</td>${years.map((y,i)=>`<td>${fmtQ(tq[i])}</td><td>${fmtQ(ts[i])}</td>`).join('')}${totalPct}</tr>`:''}</tbody></table>`;
+  if(typeof makeSortableTable==='function') makeSortableTable(el.querySelector('table'));
+}
+function renderConsumptionPage(){
+  const grid=document.getElementById('consumptionKpiGrid');
+  const ids=['consumptionRegionPage','consumptionTkkPage','consumptionIlPage'];
+  const info=document.getElementById('consumptionFilterInfo');
+  if(!data.length){ grid.innerHTML=''; ids.forEach(i=>document.getElementById(i).innerHTML=''); info.textContent='Veri yüklenmemiş.'; return; }
+  if(!consumptionHasData()){
+    info.textContent='';
+    grid.innerHTML='<div style="grid-column:1/-1;background:#fff7e6;border:1px solid #ffd591;border-radius:12px;padding:16px 18px;color:#7a4a00"><strong>Bu veride TÜKETİM MİKTARI / KOOPERATİF ADI sütunları yok.</strong><br>Admin ekranından, bu iki sütunu da içeren güncel Excel dosyasını yeniden yükleyin.</div>';
+    ids.forEach(i=>document.getElementById(i).innerHTML=''); return;
+  }
+  const years=getSelectedYearsAll();
+  const match=buildRowMatcher(CONS_FILTER_IDS);
+  const rows=data.filter(r=>years.includes(String(r['Yıl']??'').trim())&&match(r));
+  info.textContent=`${years.join(' • ')} | Filtrelenen kayıt: ${fmt(rows.length)}`;
+  grid.innerHTML=years.map(y=>{
+    const rs=rows.filter(r=>String(r['Yıl']??'').trim()===y);
+    const total=rs.reduce((a,r)=>a+(Number(r['TÜKETİM MİKTARI'])||0),0);
+    const sales=rs.reduce((a,r)=>a+(Number(r['Satış'])||0),0);
+    const koop=new Set(rs.filter(r=>(Number(r['TÜKETİM MİKTARI'])||0)!==0).map(r=>String(r['KOOPERATİF ADI']??'').trim()).filter(Boolean)).size;
+    return `<div class="kpi"><div class="kpi-label">${y} TÜKETİM MİKTARI</div><div class="kpi-value">${fmtQ(total)}</div><div class="kpi-sub">SATIŞ: ${fmtQ(sales)}${total?' • SATIŞ/TÜKETİM: '+fmtPQ(sales/total*100):''}<br>KOOPERATİF SAYISI: ${fmt(koop)}</div></div>`;
+  }).join('');
+  consumptionTable('consumptionRegionPage','Bölgeler','Bölge',rows,years);
+  consumptionTable('consumptionTkkPage','TKK Bölgeler','TKK Bölge',rows,years);
+  consumptionTable('consumptionIlPage','İller','İl',rows,years);
+}
+function showConsumptionPage(){
+  setConsumptionFilterMode(true);
+  document.getElementById('dashboardContent').classList.remove('hidden');
+  document.querySelector('#dashboardContent > #kpiArea').classList.add('hidden');
+  document.querySelector('#dashboardContent > .chart-grid').classList.add('hidden');
+  document.querySelector('#dashboardContent > .chart-card').classList.add('hidden');
+  document.getElementById('budgetPageContent').classList.add('hidden');
+  document.getElementById('balancePageContent').classList.add('hidden');
+  document.getElementById('consumptionPageContent').classList.remove('hidden');
+  document.getElementById('salesTopTitle').textContent='🌾 GÜBRETAŞ Tüketim Analizi';
+  document.getElementById('budgetPageBtn').classList.add('hidden');
+  document.getElementById('balancePageBtn').classList.add('hidden');
+  const cb=document.getElementById('consumptionPageBtn');
+  cb.textContent='📊 Dashboard'; cb.onclick=showDashboardPage;
+  renderConsumptionPage();
+}
 function showDashboardPage(){
+  setConsumptionFilterMode(false);
+  document.getElementById('consumptionPageContent').classList.add('hidden');
   document.getElementById('budgetPageContent').classList.add('hidden');
   document.getElementById('balancePageContent').classList.add('hidden');
   document.querySelector('#dashboardContent > #kpiArea').classList.remove('hidden');
@@ -1729,10 +1991,125 @@ function showDashboardPage(){
   document.getElementById('budgetPageBtn').classList.remove('hidden');
   document.getElementById('budgetPageBtn').textContent='📋 Bütçe Gerçekleşme';
   document.getElementById('budgetPageBtn').onclick=showBudgetRealizationPage;
+  document.getElementById('balancePageBtn').classList.remove('hidden');
   document.getElementById('balancePageBtn').textContent='📊 Satış Bakiye Raporu';
   document.getElementById('balancePageBtn').onclick=showSalesBalancePage;
+  const _cb=document.getElementById('consumptionPageBtn');_cb.classList.remove('hidden');_cb.textContent='🌾 GÜBRETAŞ Tüketim Analizi';_cb.onclick=showConsumptionPage;
   renderDashboard();
 }
 </script>
+
+<style id="ai-assistant-styles">
+#aiAssistantLauncher{position:fixed;right:24px;bottom:24px;z-index:99990;border:0;border-radius:999px;padding:15px 20px;background:#17212d;color:#fff;box-shadow:0 10px 32px rgba(15,23,42,.25);font-weight:700;cursor:pointer;font:600 14px system-ui,sans-serif}
+#aiAssistantPanel{position:fixed;right:24px;bottom:88px;width:min(460px,calc(100vw - 24px));height:min(700px,calc(100vh - 120px));z-index:99991;background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 18px 60px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033}
+#aiAssistantPanel.ai-open{display:flex}#aiAssistantPanel *{box-sizing:border-box}
+.ai-head{background:#17212d;color:#fff;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}.ai-head-title{font-size:15px;font-weight:750}.ai-head-sub{font-size:11px;color:#d1d5db;margin-top:3px}.ai-head button{background:transparent;color:#fff;border:0;font-size:22px;cursor:pointer;padding:3px 8px}
+.ai-suggestions{padding:10px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid #eef0f3}.ai-suggestions button{border:1px solid #e0e5eb;background:#f8fafc;color:#344054;border-radius:999px;padding:7px 10px;font-size:11px;cursor:pointer}
+#aiAssistantMessages{flex:1;overflow:auto;padding:14px;background:#f7f8fa;display:flex;flex-direction:column;gap:10px}.ai-msg{max-width:94%;padding:11px 12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}.ai-msg.user{align-self:flex-end;background:#17212d;color:#fff;border-bottom-right-radius:4px}.ai-msg.assistant{align-self:flex-start;background:#fff;border:1px solid #e7ebf0;border-bottom-left-radius:4px}.ai-msg.error{background:#fff1f2;border-color:#fecdd3;color:#9f1239}.ai-msg .ai-msg-actions{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}.ai-msg-actions button{border:1px solid #d9dee7;border-radius:7px;background:#fff;padding:6px 8px;font-size:11px;cursor:pointer;color:#344054}
+.ai-compose{padding:12px;border-top:1px solid #e7ebf0;background:#fff}.ai-compose textarea{width:100%;min-height:70px;max-height:150px;resize:vertical;border:1px solid #d8dee8;border-radius:10px;padding:10px;font:13px/1.4 inherit;outline:none}.ai-compose textarea:focus{border-color:#64748b}.ai-compose-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px}.ai-compose small{font-size:10px;color:#7b8494}.ai-send{border:0;border-radius:9px;background:#17212d;color:#fff;padding:10px 16px;font-weight:700;cursor:pointer}.ai-send:disabled{opacity:.55;cursor:wait}.ai-setup{padding:10px 12px;border-bottom:1px solid #e7ebf0;background:#fffbeb;color:#92400e;font-size:11px;display:none}.ai-setup input{width:100%;margin-top:6px;border:1px solid #e5d6b3;border-radius:7px;padding:8px;font-size:12px}
+.ai-rich h3{font-size:14px;margin:9px 0 5px}.ai-rich p{margin:5px 0}.ai-rich ul{padding-left:18px;margin:5px 0}.ai-rich table{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;display:block;overflow-x:auto}.ai-rich th,.ai-rich td{border:1px solid #e5e7eb;padding:6px;text-align:left;white-space:normal}.ai-rich th{background:#f3f4f6}.ai-rich strong{font-weight:750}
+@media(max-width:600px){#aiAssistantLauncher{right:12px;bottom:12px;padding:13px 16px}#aiAssistantPanel{right:8px;bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 92px)}}
+</style>
+<button id="aiAssistantLauncher" type="button" aria-label="Yapay zekâ satış asistanını aç">✦ Yapay Zekâ Asistanı</button>
+<section id="aiAssistantPanel" role="dialog" aria-label="GÜBRETAŞ Yapay Zekâ Satış Asistanı">
+  <header class="ai-head"><div><div class="ai-head-title">✦ GÜBRETAŞ Satış Asistanı</div><div class="ai-head-sub">Yerel veri analizi • İnternet ve API gerekmez</div></div><div style="display:flex;gap:4px;align-items:center"><button id="aiAssistantClose" type="button" aria-label="Kapat">×</button></div></header>
+
+  <div class="ai-suggestions"><button type="button" data-ai-q="Bütçe gerçekleşmesini bölge bazında analiz et; en geride kalanları sırala.">Bölge analizi</button><button type="button" data-ai-q="Bütçesi olup satışı sıfır olan ürünleri bul ve önem sırasına koy.">Satışsız ürünler</button><button type="button" data-ai-q="Satış yöneticilerinin performansını bütçe gerçekleşmesine göre değerlendir.">Yönetici performansı</button><button type="button" data-ai-q="Yönetim için kısa bir özet ve gönderime hazır e-posta taslağı oluştur.">Yönetici e-postası</button></div>
+  <div id="aiAssistantMessages" aria-live="polite"><div class="ai-msg assistant">Merhaba! Yüklediğin Excel verisini bu tarayıcıda analiz edebilirim. İnternet bağlantısı veya API anahtarı gerekmez. Bölge, ürün, yönetici, yıl ve bütçe gerçekleşmesiyle ilgili sorularını yazabilirsin. Sonuçlar yüklenen verilerden hesaplanır; veride bulunmayan nedenleri varsaymam.</div></div>
+  <form id="aiAssistantForm" class="ai-compose"><textarea id="aiAssistantQuestion" placeholder="Örn. 2026 yılında bütçesi olup satışı olmayan ürünleri analiz et..." required></textarea><div class="ai-compose-row"><small id="aiAssistantStatus">Yerel analiz etkin • Veriler cihazında kalır.</small><button id="aiAssistantSend" class="ai-send" type="submit">Gönder ↑</button></div></form>
+</section>
+<script id="ai-assistant-client">
+(function(){
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const panel=$('aiAssistantPanel'), messages=$('aiAssistantMessages'), form=$('aiAssistantForm'), question=$('aiAssistantQuestion'), send=$('aiAssistantSend'), status=$('aiAssistantStatus');
+ let history=[];
+ let lastApplied=[], lastYearsUsed=[], lastUnderstood=true;
+ function contextHeader(){
+   const parts=[];
+   FILTER_FIELDS.forEach(([id,k])=>{const v=getSelectedValues(id);if(v.length)parts.push(k+': '+v.join(', '));});
+   const yrs=lastYearsUsed.length?lastYearsUsed.join(', '):'-';
+   const multi=lastYearsUsed.length>1?' (toplamlar bu yılların birleşimidir; tek yıl için sorunda yılı yaz)':'';
+   return '📌 Kullanılan yıllar: '+yrs+multi+'\n📌 Dashboard filtreleri: '+(parts.join(' • ')||'yok (tümü)')+(lastApplied.length?'\n📌 Sorudan okunan koşullar: '+lastApplied.join(' • '):'')+'\n──────────\n';
+ }
+ const fmtAI=n=>new Intl.NumberFormat('tr-TR',{maximumFractionDigits:1}).format(Number(n)||0);
+ const moneyAI=n=>fmtAI(Math.round(Number(n)||0));
+ const pctAI=n=>'%'+fmtAI(n);
+ $('aiAssistantLauncher').addEventListener('click',()=>{panel.classList.toggle('ai-open');if(panel.classList.contains('ai-open'))question.focus()});
+ $('aiAssistantClose').addEventListener('click',()=>panel.classList.remove('ai-open'));
+ document.querySelectorAll('[data-ai-q]').forEach(b=>b.addEventListener('click',()=>{question.value=b.dataset.aiQ;form.requestSubmit()}));
+ function addMessage(text,role,actions){const div=document.createElement('div');div.className='ai-msg '+role;const body=document.createElement('div');body.textContent=text;div.appendChild(body);if(actions){const row=document.createElement('div');row.className='ai-msg-actions';const copy=document.createElement('button');copy.type='button';copy.textContent='Yanıtı kopyala';copy.onclick=()=>{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(()=>{copy.textContent='Kopyalandı'}).catch(()=>{});else{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();copy.textContent='Kopyalandı'}};row.appendChild(copy);const email=document.createElement('button');email.type='button';email.textContent='E-posta taslağı oluştur';email.onclick=()=>{question.value='Bu analiz sonuçlarına dayanarak yönetime gönderilecek kısa, profesyonel bir e-posta taslağı oluştur.';form.requestSubmit()};row.appendChild(email);div.appendChild(row)}messages.appendChild(div);messages.scrollTop=messages.scrollHeight;return div}
+ function selectedFilterRows(){try{return typeof getFiltered==='function'?getFiltered():data.slice()}catch(e){return data.slice()}}
+ function sumAI(rows){return rows.reduce((a,r)=>{a.budget+=Number(r['Bütçe'])||0;a.sales+=Number(r['Satış'])||0;return a},{rows:rows.length,budget:0,sales:0})}
+ function groupAI(rows,key){const m=new Map();rows.forEach(r=>{const name=String(r[key]??'').trim()||'(Boş)';if(!m.has(name))m.set(name,{name,rows:0,budget:0,sales:0});const x=m.get(name);x.rows++;x.budget+=Number(r['Bütçe'])||0;x.sales+=Number(r['Satış'])||0});return [...m.values()].map(x=>({...x,diff:x.sales-x.budget,pct:x.budget?x.sales/x.budget*100:0})).sort((a,b)=>b.sales-a.sales)}
+ function reportGroup(title,list,limit=10){if(!list.length)return title+': Bu kırılımda veri bulunamadı.';return title+'\n'+list.slice(0,limit).map((x,i)=>`${i+1}. ${x.name} — Satış: ${moneyAI(x.sales)} | Bütçe: ${moneyAI(x.budget)} | Fark: ${moneyAI(x.diff)} | Gerçekleşme: ${pctAI(x.pct)}`).join('\n')}
+ function localAnalyze(q){
+   if(!Array.isArray(data)||!data.length)return "Henüz veri yüklenmemiş. Önce dashboard'a giriş yapıp Excel dosyanı yükle.";
+   const t=q.toLocaleLowerCase('tr-TR');
+   const _qYear=t.match(/\b(20\d{2})\b/);
+   const _match=buildRowMatcher();
+   let rows, yearsUsed;
+   if(_qYear){ yearsUsed=[_qYear[1]]; rows=data.filter(r=>String(r['Yıl']??'').trim()===_qYear[1]&&_match(r)); }
+   else { yearsUsed=getTableYears(); rows=data.filter(r=>yearsUsed.includes(String(r['Yıl']??'').trim())&&_match(r)); }
+   lastYearsUsed=yearsUsed;
+   const normAI=v=>String(v??'').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/İ/g,'i').replace(/[^a-z0-9]+/g,' ').trim();
+   const applied=[];lastApplied=applied;lastUnderstood=true;
+   // Sorudaki açık yıl, ürün grubu ve bölge koşullarını dashboard filtrelerine ekle.
+   const yearMatch=t.match(/\b(20\d{2})\b/);
+   if(yearMatch){applied.push('Yıl: '+yearMatch[1]);}
+   if(/\bkat[iı]\b/.test(t)){
+     rows=rows.filter(r=>{const g=normAI(r['Ürün Grubu']??r['ÜrünGrubu']??r['Grup']??'');return g==='kati'||g.includes('kati kimyevi')||g.startsWith('kati ');});
+     applied.push('Ürün Grubu: Katı');
+   } else if(/\bbb[gğ]\b|bitki besleme grubu/.test(t)){
+     rows=rows.filter(r=>{const g=normAI(r['Ürün Grubu']??r['ÜrünGrubu']??'');return g.includes('bbg')||g.includes('bitki besleme');});applied.push('Ürün Grubu: BBG');
+   }
+   const knownRegions=['Batı Akdeniz','Doğu Akdeniz','Güneydoğu Anadolu','İç Anadolu','Marmara','Karadeniz','Ege','GAP'];
+   const _nt=' '+normAI(t)+' ';
+   const requestedRegion=knownRegions.find(region=>_nt.includes(' '+normAI(region)+' '));
+   if(requestedRegion){const wanted=normAI(requestedRegion);rows=rows.filter(r=>normAI(r['Bölge'])===wanted);applied.push('Bölge: '+requestedRegion);}
+   if(!rows.length)return 'Sorudaki koşullara göre kayıt bulunamadı. Uygulanan koşullar: '+(applied.join(', ')||'mevcut dashboard filtreleri')+'. Dashboard filtrelerini ve Excel sütunlarındaki yıl/bölge/ürün grubu değerlerini kontrol et.';
+   const total=sumAI(rows), realization=total.budget?total.sales/total.budget*100:0, gap=total.sales-total.budget;
+   const dimension=t.includes('yönetici')||t.includes('personel')?'Yönetici':t.includes('ürün grubu')||t.includes('ürün grupları')?'Ürün Grubu':t.includes('ürün')?'Ürün Adı':t.includes('il baz')||t.includes('şehir')?'İl':t.includes('aylık')||t.includes('aylara')||t.includes('ay baz')?'Ay':t.includes('tkk')?'TKK Bölge':t.includes('yıl baz')||t.includes('yıllara')?'Yıl':'Bölge';
+   const groups=groupAI(rows,dimension);
+   if(/en az sat[iı]s[iı]|en az satan|en dusuk sat[iı]s|en düşük sat[iı]s|en az sat[iı]s[ıi] olan ürün|en az satış/.test(normAI(t)) || (/en az/.test(normAI(t))&&/urun/.test(normAI(t))&&/satis/.test(normAI(t)))){
+     const products=groupAI(rows,'Ürün Adı').sort((a,b)=>a.sales-b.sales || b.budget-a.budget);
+     const minSales=products.length?products[0].sales:0;
+     const tied=products.filter(x=>x.sales===minSales);
+     const filterText=applied.length?'Uygulanan koşullar: '+applied.join(' • ')+'\n':'';
+     return filterText+'En az satış yapılan ürün'+(tied.length>1?'ler':'')+':\n'+tied.slice(0,10).map(x=>`• ${x.name} — Satış: ${moneyAI(x.sales)} | Bütçe: ${moneyAI(x.budget)} | Fark: ${moneyAI(x.diff)}`).join('\n')+'\n\nKarşılaştırılan ürün sayısı: '+products.length+' • Analiz edilen kayıt: '+fmtAI(rows.length)+(minSales===0?'\nNot: En düşük satış 0; bu ürün(ler) için seçilen koşullarda satış kaydı oluşmamış.':'');
+   }
+   const zero=groups.filter(x=>x.budget>0&&x.sales===0).sort((a,b)=>b.budget-a.budget);
+   const low=groups.filter(x=>x.budget>0&&x.sales>0&&x.pct<80).sort((a,b)=>a.pct-b.pct);
+   const strong=groups.filter(x=>x.budget>0&&x.pct>=100).sort((a,b)=>b.pct-a.pct);
+   const lines=[];
+   if(/e-?posta|mail|yönetim özeti|yöneticiye|rapor hazırla/.test(t)){
+     const weakest=groups.filter(x=>x.budget>0).sort((a,b)=>a.pct-b.pct).slice(0,5);
+     return `Konu: Satış ve Bütçe Gerçekleşme Analizi\n\nMerhaba,\n\nSeçili dashboard verileri üzerinden yapılan analizde toplam bütçe ${moneyAI(total.budget)}, satış ${moneyAI(total.sales)} ve bütçe gerçekleşmesi ${pctAI(realization)} olarak hesaplanmıştır. Bütçe-satış farkı ${moneyAI(gap)}'dır.\n\nÖne çıkan takip alanları:\n${weakest.length?weakest.map(x=>`• ${x.name}: ${pctAI(x.pct)} gerçekleşme; satış ${moneyAI(x.sales)}, bütçe ${moneyAI(x.budget)}.`).join('\n'):'• Değerlendirilecek bütçeli kırılım bulunamadı.'}\n\nBütçesi bulunmasına rağmen satış oluşmayan kalemlerin ve düşük gerçekleşmeli bölgelerin ilgili ekiplerle kontrol edilmesi; kalan dönem için sipariş, sevk ve satış planlarının netleştirilmesi önerilir. Bu değerlendirme mevcut sayısal sonuçlara dayanır; düşük performansın nedeni veri setinde ayrıca belirtilmedikçe kesinleştirilemez.\n\nİyi çalışmalar.`;
+   }
+   if(/satışsız|satışı olmayan|satış yok|sıfır satış|satışı sıfır|satış olmayan|bütçesi olup/.test(t)){
+     const z=groupAI(rows,'Ürün Adı').filter(x=>x.budget>0&&x.sales===0).sort((a,b)=>b.budget-a.budget);
+     if(!z.length)return 'Seçili verilerde bütçesi pozitif ve satışı sıfır olan ürün bulunamadı.';
+     return `Bütçesi olup satışı olmayan ürünler (${z.length} kalem)\nÖncelik, bütçe tutarı en yüksek olandan başlanarak sıralandı.\n\n${z.slice(0,30).map((x,i)=>`${i+1}. ${x.name} — Bütçe: ${moneyAI(x.budget)} | Satış: 0 | Fark: ${moneyAI(x.diff)}`).join('\n')}\n\nÖneri: Önce bütçesi yüksek kalemlerin satış planı, sipariş durumu ve sevk edilebilirliği ilgili bölgeyle kontrol edilmeli.`;
+   }
+   if(/geride|en düşük|en dusuk|düşük gerçekleş|dusuk gercekles|performans|başarılı|başarı|gerçekleşme|gerceklesme|bölge baz|bölgeleri sırala/.test(t)){
+     const usable=groups.filter(x=>x.budget>0).sort((a,b)=>a.pct-b.pct);
+     return reportGroup(dimension+' bazında bütçe gerçekleşmesi — en düşükten yükseğe',usable,Math.min(15,usable.length))+'\n\nGenel gerçekleşme: '+pctAI(realization)+'. '+(low.length?`%80 altında gerçekleşen ${low.length} ${dimension.toLocaleLowerCase('tr-TR')} var.`:'Bu kırılımda bütçeli grupların hiçbiri %80 altında değil.')+'\nYorum: Öncelikle düşük gerçekleşmeli ve bütçesi yüksek grupların satış/sipariş planı kontrol edilmeli. Veride neden bilgisi olmadığı için sebep tahmini yapılmamıştır.';
+   }
+   if(/en çok satan|en yüksek satış|satış lider|ilk 10|top 10|en iyi/.test(t))return reportGroup(dimension+' bazında en yüksek satış',groups.slice().sort((a,b)=>b.sales-a.sales),10);
+   if(/yıl karşılaştır|yıllık karşılaştır|geçen yıl|önceki yıl|yıla göre|yıllara göre/.test(t))return reportGroup('Yıl bazında satış ve bütçe',groupAI(rows,'Yıl').sort((a,b)=>String(a.name).localeCompare(String(b.name),'tr',{numeric:true})),20);
+   if(/özet|genel durum|analiz et|yorumla|yorum yap|durum nedir|nasıl gidiyor/.test(t)){
+     const sorted=groups.filter(x=>x.budget>0).sort((a,b)=>a.pct-b.pct);
+     return `GENEL SATIŞ ANALİZİ\n\n• Kayıt sayısı: ${fmtAI(rows.length)}\n• Toplam bütçe: ${moneyAI(total.budget)}\n• Toplam satış: ${moneyAI(total.sales)}\n• Bütçe-satış farkı: ${moneyAI(gap)}\n• Bütçe gerçekleşmesi: ${pctAI(realization)}\n\n${reportGroup(dimension+' kırılımı — en düşük gerçekleşme',sorted,5)}\n\n${zero.length?`Dikkat: Bu kırılımda bütçesi olduğu halde satışı olmayan ${zero.length} grup bulunuyor.`:'Bütçesi olup satışı sıfır olan grup bu kırılımda görünmüyor.'}\n\nYönetim yorumu: Gerçekleşme %100 altında ise bütçe açığı vardır. Öncelik, bütçe tutarı yüksek ve gerçekleşmesi düşük gruplara verilmelidir. Veride yer almayan nedenler kesin bilgi gibi sunulmamıştır.`;
+   }
+   // Default answer: useful KPI snapshot and best matching breakdown.
+   lastUnderstood=false;
+   return `Sorunu tam olarak anlayamadım; bu yüzden genel görünümü gösteriyorum.\n\n• Filtrelenmiş kayıt: ${fmtAI(rows.length)}\n• Bütçe: ${moneyAI(total.budget)}\n• Satış: ${moneyAI(total.sales)}\n• Fark (Satış − Bütçe): ${moneyAI(gap)}\n• Gerçekleşme: ${pctAI(realization)}\n\n${reportGroup(dimension+' bazında sonuçlar',groups,10)}\n\nDaha hedefli sonuç için “bütçesi olup satışı olmayan ürünleri bul”, “bölge gerçekleşmesini en düşükten sırala” veya “yönetici performansını analiz et” gibi sorabilirsin.`;
+ }
+ function sendQuestion(q){if(!q.trim())return;addMessage(q,'user');question.value='';send.disabled=true;status.textContent='Yüklenen veriler taranıyor…';const pending=addMessage('Dashboard verileri taranıyor ve toplamlar hesaplanıyor…','assistant');try{const _raw=localAnalyze(q);const answer=(/^Henüz veri yüklenmemiş/.test(_raw)||/^Sorudaki koşullara göre kayıt bulunamadı/.test(_raw))?_raw:contextHeader()+_raw;pending.remove();addMessage(answer,'assistant',true);history.push({role:'user',content:q},{role:'assistant',content:answer});history=history.slice(-12);status.textContent='Yerel analiz tamamlandı • Yıllar: '+(lastYearsUsed.join(', ')||'-');}catch(e){pending.remove();addMessage('Veri analizi yapılamadı: '+(e.message||'Bilinmeyen hata')+'\n\nÖnce dashboard verisinin yüklü olduğunu ve filtrelerin doğru seçildiğini kontrol et.','error');status.textContent='Analiz hatası';}finally{send.disabled=false;question.focus()}}
+ form.addEventListener('submit',e=>{e.preventDefault();sendQuestion(question.value)});
+ question.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit()}});
+})();
+</script>
+
 </body>
 </html>
