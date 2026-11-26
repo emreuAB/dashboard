@@ -523,10 +523,16 @@ function updateUploadProgress(percent, text) {
 
 function trNum(v) {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
-  let s = String(v ?? '').trim().replace(/\s/g, '');
+  let s = String(v ?? '').trim().replace(/[\s\u00A0]/g, '');
   if (!s) return 0;
-  if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
-  else if (s.includes(',')) s = s.replace(',', '.');
+  const dots = (s.match(/\./g) || []).length, commas = (s.match(/,/g) || []).length;
+  if (dots && commas) {
+    // Sonra gelen ayraç ondalıktır
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+  } else if (commas > 1) s = s.replace(/,/g, '');
+  else if (dots > 1) s = s.replace(/\./g, '');
+  else if (commas === 1) s = s.replace(',', '.');
   const n = parseFloat(s);
   return isFinite(n) ? n : 0;
 }
@@ -569,27 +575,49 @@ function getSheetUrl() {
   return (el && el.value.trim()) || saved || SHEET_URL_DEFAULT;
 }
 
-function sheetCsvCandidates(url) {
+function sheetExportUrls(url) {
   const id = (url.match(/\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
   if (!id) throw new Error('Geçerli bir Google Sheets bağlantısı girin.');
   const gid = (url.match(/[#&?]gid=(\d+)/) || [])[1];
   const g = gid ? '&gid=' + gid : '';
-  return [
-    'https://docs.google.com/spreadsheets/d/' + id + '/export?format=csv' + g,
-    'https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq?tqx=out:csv' + g
-  ];
+  const base = 'https://docs.google.com/spreadsheets/d/' + id;
+  return { xlsx: base + '/export?format=xlsx', csv: [base + '/export?format=csv' + g, base + '/gviz/tq?tqx=out:csv' + g] };
 }
 
-async function fetchSheetCsv(url) {
+function sheetHasHeaders(sheet) {
+  if (!sheet || !sheet['!ref']) return false;
+  const r = XLSX.utils.decode_range(sheet['!ref']);
+  const row = XLSX.utils.sheet_to_json(sheet, { header: 1, range: { s: { r: r.s.r, c: r.s.c }, e: { r: r.s.r, c: r.e.c } }, blankrows: false, defval: '' })[0] || [];
+  const h = row.map(x => String(x).trim());
+  return h.includes('Yıl') && h.includes('Bütçe') && h.includes('Satış');
+}
+
+// Önce xlsx (ham sayısal değerler, Excel yüklemesiyle birebir aynı); olmazsa CSV (biçimlendirilmiş metin).
+async function fetchSheetWorkbookSheet(url) {
+  const urls = sheetExportUrls(url);
   let lastErr = null;
-  for (const cand of sheetCsvCandidates(url)) {
+  try {
+    const res = await fetch(urls.xlsx, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buf = await res.arrayBuffer();
+    const sig = new Uint8Array(buf.slice(0, 2));
+    if (sig[0] !== 0x50 || sig[1] !== 0x4B) throw new Error('Tablo herkese açık değil (xlsx yerine giriş sayfası döndü).');
+    updateUploadProgress(10, 'Excel verisi çözümleniyor...');
+    await new Promise(r => setTimeout(r, 0));
+    const wb = XLSX.read(buf, { type: 'array', dense: true });
+    const name = wb.SheetNames.find(n => sheetHasHeaders(wb.Sheets[n]));
+    if (!name) throw new Error('Beklenen başlıkları içeren sayfa bulunamadı.');
+    return { sheet: wb.Sheets[name], source: 'xlsx' };
+  } catch (e) { lastErr = e; console.warn('xlsx indirme başarısız, CSV deneniyor:', e); }
+  for (const cand of urls.csv) {
     try {
       const res = await fetch(cand, { cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
+      const text = (await res.text()).replace(/^\uFEFF/, '');
       if (/^\s*<(!doctype|html)/i.test(text)) throw new Error('Tablo herkese açık değil (giriş sayfası döndü).');
       if (!text.trim()) throw new Error('Tablo boş döndü.');
-      return text.replace(/^\uFEFF/, '');
+      const wb = XLSX.read(text, { type: 'string', raw: true, dense: true });
+      return { sheet: wb.Sheets[wb.SheetNames[0]], source: 'csv' };
     } catch (e) { lastErr = e; }
   }
   throw new Error('Google Sheets verisi alınamadı. Tablonun "Bağlantıya sahip herkes görüntüleyebilir" olarak paylaşıldığından ve internet bağlantısından emin olun. (' + (lastErr && lastErr.message ? lastErr.message : lastErr) + ')');
@@ -620,13 +648,10 @@ async function syncFromSheet(opts) {
     }
     const url = getSheetUrl();
     updateUploadProgress(2, 'Google Sheets verisi indiriliyor...');
-    const csv = await fetchSheetCsv(url);
+    const fetched = await fetchSheetWorkbookSheet(url);
+    const sheet = fetched.sheet;
+    const sourceKind = fetched.source;
     try { localStorage.setItem(SHEET_URL_KEY, url); } catch (e) {}
-
-    updateUploadProgress(10, 'Veri çözümleniyor...');
-    await new Promise(r => setTimeout(r, 0));
-    const workbook = XLSX.read(csv, { type: 'string', raw: true, dense: true });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
     if (!sheet || !sheet['!ref']) throw new Error('Tabloda okunabilir veri bulunamadı.');
 
     const range = XLSX.utils.decode_range(sheet['!ref']);
@@ -695,7 +720,7 @@ async function syncFromSheet(opts) {
     dataUpdatedAt = new Date().toISOString();
 
     updateUploadProgress(100, fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi.' + (memMode ? ' (Tarayıcı depolaması kapalı: veri yalnızca bu oturumda tutulur.)' : ''));
-    msg('uploadMsg', fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi ve kullanıma hazır.', 'ok');
+    msg('uploadMsg', fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi ve kullanıma hazır.' + (sourceKind === 'csv' ? ' ⚠ Uyarı: xlsx indirilemedi, CSV (biçimlendirilmiş metin) kullanıldı; toplamları kontrol edin.' : ''), 'ok');
     updateSyncInfo();
     if (opts.refreshUI) {
       renderPreview();
