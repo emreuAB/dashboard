@@ -339,15 +339,27 @@ const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağus
 const DB_NAME = 'SalesDashboardDB', DB_VERSION = 1, STORE_NAME = 'salesData';
 let currentUser = null, currentRegion = null, data = [], db = null;
 
+let memMode = false; const memStore = new Map();
 function initDB() {
   return new Promise((resolve) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => { console.error('IndexedDB açılamadı'); resolve(false); };
-    req.onsuccess = () => { db = req.result; console.log('IndexedDB açıldı'); resolve(true); };
-    req.onupgradeneeded = (e) => {
-      const d = e.target.result;
-      if (!d.objectStoreNames.contains(STORE_NAME)) d.createObjectStore(STORE_NAME);
+    let done = false;
+    const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+    const fallback = (why) => {
+      console.warn('IndexedDB kullanılamıyor, geçici bellek moduna geçildi:', why);
+      memMode = true; db = {}; finish(true);
     };
+    try {
+      if (!window.indexedDB) return fallback('indexedDB yok');
+      const timer = setTimeout(() => fallback('zaman aşımı'), 3000);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onerror = () => { clearTimeout(timer); fallback(req.error); };
+      req.onblocked = () => { clearTimeout(timer); fallback('blocked'); };
+      req.onsuccess = () => { clearTimeout(timer); if (done) return; db = req.result; console.log('IndexedDB açıldı'); finish(true); };
+      req.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains(STORE_NAME)) d.createObjectStore(STORE_NAME);
+      };
+    } catch (e) { fallback(e); }
   });
 }
 const DB_BATCH_SIZE = 5000;
@@ -360,6 +372,7 @@ function idbRequest(req) {
 }
 
 async function saveDataChunk(prefix, index, rows) {
+  if (memMode) { memStore.set(prefix + '_' + index, rows); return; }
   return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction([STORE_NAME], 'readwrite');
@@ -372,6 +385,7 @@ async function saveDataChunk(prefix, index, rows) {
 }
 
 async function commitDataBatches(prefix, batchCount, rowCount) {
+  if (memMode) { memStore.set('records_meta', { prefix: prefix, batchCount: batchCount, rowCount: rowCount, updatedAt: new Date().toISOString() }); return; }
   return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction([STORE_NAME], 'readwrite');
@@ -388,6 +402,12 @@ async function commitDataBatches(prefix, batchCount, rowCount) {
 
 async function loadData() {
   if (!db) { const ok = await initDB(); if (!ok) return; }
+  if (memMode) {
+    const m = memStore.get('records_meta');
+    dataUpdatedAt = m && m.updatedAt ? m.updatedAt : null;
+    data = m ? Array.from({length: m.batchCount}, (_, i) => memStore.get(m.prefix + '_' + i) || []).flat() : [];
+    return;
+  }
   try {
     const tx = db.transaction([STORE_NAME], 'readonly');
     const store = tx.objectStore(STORE_NAME);
@@ -412,6 +432,7 @@ async function loadData() {
 
 async function deleteData() {
   if (!db) { const ok = await initDB(); if (!ok) return; }
+  if (memMode) { memStore.clear(); return; }
   return new Promise((resolve, reject) => {
     const tx = db.transaction([STORE_NAME], 'readwrite');
     tx.objectStore(STORE_NAME).clear();
@@ -647,12 +668,12 @@ async function syncFromSheet(opts) {
     await commitDataBatches(newPrefix, batchCount, rowCount);
 
     // Önceki sürümün tek parça kaydını ve eski parça kümelerini temizle.
-    const keysTx = db.transaction([STORE_NAME], 'readonly');
-    const keys = await idbRequest(keysTx.objectStore(STORE_NAME).getAllKeys());
+    const keys = memMode ? Array.from(memStore.keys()) : await idbRequest(db.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME).getAllKeys());
     const oldKeys = keys.filter(k => k === 'records' ||
       (typeof k === 'string' && k.startsWith('records_') &&
        k !== 'records_meta' && !k.startsWith(newPrefix + '_')));
-    if (oldKeys.length) {
+    if (oldKeys.length && memMode) oldKeys.forEach(k => memStore.delete(k));
+    else if (oldKeys.length) {
       await new Promise((resolve, reject) => {
         const tx = db.transaction([STORE_NAME], 'readwrite');
         const store = tx.objectStore(STORE_NAME);
@@ -663,14 +684,17 @@ async function syncFromSheet(opts) {
     }
 
     // Mevcut dashboard fonksiyonları data dizisini kullanmaya devam eder.
-    const readTx = db.transaction([STORE_NAME], 'readonly');
-    const readStore = readTx.objectStore(STORE_NAME);
-    const batchReads = [];
-    for (let i = 0; i < batchCount; i++) batchReads.push(idbRequest(readStore.get(newPrefix + '_' + i)));
-    data = (await Promise.all(batchReads)).flatMap(x => Array.isArray(x) ? x : []);
+    if (memMode) {
+      data = Array.from({length: batchCount}, (_, i) => memStore.get(newPrefix + '_' + i) || []).flat();
+    } else {
+      const readStore = db.transaction([STORE_NAME], 'readonly').objectStore(STORE_NAME);
+      const batchReads = [];
+      for (let i = 0; i < batchCount; i++) batchReads.push(idbRequest(readStore.get(newPrefix + '_' + i)));
+      data = (await Promise.all(batchReads)).flatMap(x => Array.isArray(x) ? x : []);
+    }
     dataUpdatedAt = new Date().toISOString();
 
-    updateUploadProgress(100, fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi.');
+    updateUploadProgress(100, fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi.' + (memMode ? ' (Tarayıcı depolaması kapalı: veri yalnızca bu oturumda tutulur.)' : ''));
     msg('uploadMsg', fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi ve kullanıma hazır.', 'ok');
     updateSyncInfo();
     if (opts.refreshUI) {
@@ -685,11 +709,12 @@ async function syncFromSheet(opts) {
     console.error('Google Sheets veri çekme hatası:', err);
     // Yarım kalan parçaları sil; önceki aktif veri kümesi korunur.
     try {
+      if (memMode) { Array.from(memStore.keys()).filter(k => String(k).startsWith(newPrefix + '_')).forEach(k => memStore.delete(k)); throw null; }
       const tx = db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const keys = await idbRequest(store.getAllKeys());
       keys.filter(k => typeof k === 'string' && k.startsWith(newPrefix + '_')).forEach(k => store.delete(k));
-    } catch (cleanupError) { console.warn('Geçici kayıt temizliği:', cleanupError); }
+    } catch (cleanupError) { if (cleanupError) console.warn('Geçici kayıt temizliği:', cleanupError); }
     updateUploadProgress(0, 'Veri çekilemedi.');
     msg('uploadMsg', 'Veri çekme hatası: ' + (err && err.message ? err.message : err), 'err');
     return false;
