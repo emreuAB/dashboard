@@ -4,7 +4,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GÜBRETAŞ Satış Analiz Dashboard</title>
+<title>Satış Analiz Dashboard - Bölge ve Tablo Güncellemeleri</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#f4f6f8;--card:#fff;--text:#172033;--muted:#7b8494;--border:#e7ebf0;--blue:#3b82f6;--green:#16b364;--red:#ef4444;--orange:#f59e0b;--shadow:0 3px 16px rgba(15,23,42,.06)}
@@ -223,16 +223,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 </div>
 
 <div id="adminView" class="hidden">
-  <div class="topbar"><h1>📁 Admin Paneli — Veri Yükleme</h1><div><span class="user">Admin</span><button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button></div></div>
+  <div class="topbar"><h1>📁 Admin Paneli — Veri Kaynağı</h1><div><span class="user">Admin</span><button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button></div></div>
   <div class="container">
-    <div class="tabs"><div class="tab active" onclick="switchAdminTab(event,'upload')">Dosya Yükle</div><div class="tab" onclick="switchAdminTab(event,'preview')">Veri Önizleme</div></div>
+    <div class="tabs"><div class="tab active" onclick="switchAdminTab(event,'upload')">Veri Kaynağı</div><div class="tab" onclick="switchAdminTab(event,'preview')">Veri Önizleme</div></div>
     <div id="adminUpload">
-      <div class="upload-area" id="dropZone">
-        <p style="font-size:16px;margin-bottom:12px;font-weight:500;">Excel/CSV dosyanızı sürükleyip bırakın</p>
-        <p style="font-size:13px;color:#888;margin-bottom:18px;">veya</p>
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
-        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Dosya Seç</button>
-        <p style="font-size:12px;color:#aaa;margin-top:18px;">Beklenen 15 başlık:<br><strong>Yıl, Bölge, Ürün, İl, Ay, Yönetici, Bütçe, Satış, Ürün Adı, Ürün Grubu, TKK Bölge, Bakiye, Sipariş, Cari Hesap Adı, Dağıtım Kanalı</strong><br>GÜBRETAŞ Tüketim Analizi ekranı için ek (opsiyonel) 2 başlık:<br><strong>TÜKETİM MİKTARI, KOOPERATİF ADI</strong></p>
+      <div class="upload-area" id="sheetPanel" style="text-align:left;padding:28px 32px;">
+        <p style="font-size:16px;margin-bottom:12px;font-weight:600;">📗 Veri kaynağı: Google Sheets</p>
+        <input type="url" id="sheetUrl" value="https://docs.google.com/spreadsheets/d/1t_SQXnZzJknCXTkuYF4mqCd_WNDzJfi3mlTHQsiM_W0/edit?gid=688838427#gid=688838427" style="width:100%;padding:10px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;margin-bottom:14px;box-sizing:border-box;">
+        <button class="btn btn-secondary" id="syncBtn" onclick="syncFromSheet({refreshUI:true})">🔄 Google Sheets'ten Veriyi Çek</button>
+        <span id="lastSyncInfo" style="font-size:12px;color:#667085;margin-left:12px;"></span>
+        <p style="font-size:12px;color:#aaa;margin-top:18px;">Tablo, <strong>"Bağlantıya sahip herkes görüntüleyebilir"</strong> olarak paylaşılmış olmalıdır. İlk sayfadaki (gid ile belirtilen) sekme okunur.<br>Beklenen 15 başlık:<br><strong>Yıl, Bölge, Ürün, İl, Ay, Yönetici, Bütçe, Satış, Ürün Adı, Ürün Grubu, TKK Bölge, Bakiye, Sipariş, Cari Hesap Adı, Dağıtım Kanalı</strong><br>GÜBRETAŞ Tüketim Analizi ekranı için ek (opsiyonel) 2 başlık:<br><strong>TÜKETİM MİKTARI, KOOPERATİF ADI</strong></p>
       </div>
       <div id="uploadMsg"></div>
       <div id="uploadProgressWrap" class="hidden" style="margin:12px 0 18px;background:#eef1f4;border-radius:10px;overflow:hidden;height:24px;">
@@ -249,7 +249,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 </div>
 
 <div id="satisView" class="hidden">
-  <div class="topbar"><h1 id="salesTopTitle">📊 Satış Analiz Dashboard</h1><div><span class="user">Satış</span><button id="budgetPageBtn" class="btn btn-sm" onclick="showBudgetRealizationPage()">📋 Bütçe Gerçekleşme</button><button id="balancePageBtn" class="btn btn-sm" onclick="showSalesBalancePage()">📊 Satış Bakiye Raporu</button><button id="consumptionPageBtn" class="btn btn-sm" onclick="showConsumptionPage()">🌾 GÜBRETAŞ Tüketim Analizi</button><button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button></div></div>
+  <div class="topbar"><h1 id="salesTopTitle">📊 Satış Analiz Dashboard</h1><div class="topbar-actions"><span class="user">Satış</span><button class="btn btn-sm" id="pdfExportBtn" onclick="exportDashboardPDF()">📄 PDF olarak indir</button><button id="budgetPageBtn" class="btn btn-sm" onclick="showBudgetRealizationPage()">📋 Bütçe Gerçekleşme</button><button id="balancePageBtn" class="btn btn-sm" onclick="showSalesBalancePage()">📊 Satış Bakiye Raporu</button><button id="consumptionPageBtn" class="btn btn-sm" onclick="showConsumptionPage()">🌾 GÜBRETAŞ Tüketim Analizi</button><button class="btn btn-sm btn-secondary" onclick="logout()">Çıkış</button></div></div>
   <div class="container">
     <div id="noDataBanner" class="no-data-banner hidden"><strong>📭 Henüz veri yüklenmemiş</strong><br>Admin kullanıcısı tarafından veri yüklenmesi gerekmektedir.</div>
     <div id="dashboardContent">
@@ -392,6 +392,7 @@ async function loadData() {
     const tx = db.transaction([STORE_NAME], 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const meta = await idbRequest(store.get('records_meta'));
+    dataUpdatedAt = meta && meta.updatedAt ? meta.updatedAt : null;
     if (meta && meta.prefix && meta.batchCount) {
       const requests = [];
       for (let i = 0; i < meta.batchCount; i++) requests.push(idbRequest(store.get(meta.prefix + '_' + i)));
@@ -439,16 +440,17 @@ async function doLogin() {
   if (u === 'admin') {
     document.getElementById('adminView').classList.remove('hidden');
     document.getElementById('satisView').classList.add('hidden');
-    const synced = await fetchGoogleSheetData();
-    if (!synced) await loadData();
+    await loadData();
+    await autoSyncIfNeeded();
     renderPreview();
+    updateSyncInfo();
   } else {
     document.getElementById('satisView').classList.remove('hidden');
     document.getElementById('adminView').classList.add('hidden');
     const titleEl = document.getElementById('salesTopTitle');
     if (titleEl) titleEl.textContent = currentRegion ? '📊 Satış Analiz Dashboard — ' + currentRegion : '📊 Satış Analiz Dashboard';
-    const synced = await fetchGoogleSheetData();
-    if (!synced) await loadData();
+    await loadData();
+    await autoSyncIfNeeded();
     console.log('Satış girişi - Veri sayısı:', data.length);
     if (data.length === 0) {
       document.getElementById('noDataBanner').classList.remove('hidden');
@@ -498,41 +500,30 @@ function updateUploadProgress(percent, text) {
   if (label) label.textContent = text || '';
 }
 
-function parseLocalizedNumber(value) {
-  if (value === null || value === undefined || value === '') return 0;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  let s = String(value).trim().replace(/[₺\s]/g, '');
-  if (!s || s === '-') return 0;
-  const negative = /^\(.*\)$/.test(s);
-  s = s.replace(/[()]/g, '').replace(/[^0-9,.-]/g, '');
+function trNum(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  let s = String(v ?? '').trim().replace(/\s/g, '');
   if (!s) return 0;
-  const comma = s.lastIndexOf(',');
-  const dot = s.lastIndexOf('.');
-  if (comma !== -1 && dot !== -1) {
-    if (comma > dot) s = s.replace(/\./g, '').replace(',', '.');
-    else s = s.replace(/,/g, '');
-  } else if (comma !== -1) {
-    const decimals = s.length - comma - 1;
-    s = decimals > 0 && decimals <= 2 ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
-  } else if (dot !== -1) {
-    const parts = s.split('.');
-    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) s = parts.join('');
-  }
-  const n = Number(s);
-  return Number.isFinite(n) ? (negative ? -n : n) : 0;
+  if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (s.includes(',')) s = s.replace(',', '.');
+  const n = parseFloat(s);
+  return isFinite(n) ? n : 0;
 }
 
 function normalizeUploadRow(r) {
-  r['Bütçe'] = parseLocalizedNumber(r['Bütçe']);
-  r['Satış'] = parseLocalizedNumber(r['Satış']);
-  r['Sevk'] = parseLocalizedNumber(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat']);
-  r['Sipariş'] = parseLocalizedNumber(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS']);
-  r['Bakiye'] = parseLocalizedNumber(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE']);
+  r['Bütçe'] = trNum(r['Bütçe']);
+  r['Satış'] = trNum(r['Satış']);
+  r['Sevk'] = trNum(r['Sevk'] ?? r['SEVK'] ?? r['Sevkiyat']);
+  r['Sipariş'] = trNum(r['Sipariş'] ?? r['SİPARİŞ'] ?? r['Siparis'] ?? r['SIPARIS']);
+  r['Bakiye'] = trNum(r['Bakiye'] ?? r['BAKİYE'] ?? r['BAKIYE']);
   r['Yıl'] = parseInt(r['Yıl'], 10) || 0;
   // Pazarlama Tüketim Miktarı sütunları (opsiyonel): başlık yazımı farklı olsa da tanınır.
   const qk = ['TÜKETİM MİKTARI','Tüketim Miktarı','TÜKETIM MIKTARI','Tüketim Miktari','TUKETIM MIKTARI'].find(k => r[k] !== undefined);
   if (qk !== undefined) {
-    const n = parseLocalizedNumber(r[qk]);
+    let t = String(r[qk] ?? '').trim().replace(/\s/g,'');
+    if (t.includes('.') && t.includes(',')) t = t.replace(/\./g,'').replace(',','.');
+    else if (t.includes(',')) t = t.replace(',','.');
+    const n = typeof r[qk] === 'number' ? r[qk] : parseFloat(t);
     if (qk !== 'TÜKETİM MİKTARI') delete r[qk];
     r['TÜKETİM MİKTARI'] = isFinite(n) ? n : 0;
   }
@@ -545,107 +536,77 @@ function normalizeUploadRow(r) {
   return r;
 }
 
-const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1entxGH1kWhdF0IudnpUwJjmIDORRK1dKKVjWv4CLA1M/gviz/tq?gid=1319335015&tqx=out:csv';
+const SHEET_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/1t_SQXnZzJknCXTkuYF4mqCd_WNDzJfi3mlTHQsiM_W0/edit?gid=688838427#gid=688838427';
+const SHEET_URL_KEY = 'gubretas_sheet_url';
+const SHEET_REFRESH_MINUTES = 60; // Veri bu süreden eskiyse girişte otomatik yenilenir
+let dataUpdatedAt = null, syncing = false;
 
-async function fetchGoogleSheetData() {
-  const newPrefix = 'records_gsheet_' + Date.now();
-  let batchCount = 0;
-  let rowCount = 0;
-  try {
-    if (!db) {
-      const ok = await initDB();
-      if (!ok) throw new Error('Tarayıcı veri alanı açılamadı.');
-    }
-    console.log('Google Sheets verisi alınıyor...');
-    const response = await fetch(GOOGLE_SHEET_CSV_URL, { method: 'GET', cache: 'no-store' });
-    if (!response.ok) throw new Error('Google Sheets HTTP ' + response.status);
-    const csvText = await response.text();
-    if (!csvText || /<\s*html/i.test(csvText.slice(0, 500))) {
-      throw new Error('Google Sheets CSV verisi alınamadı. Paylaşım ve bağlantıyı kontrol edin.');
-    }
-    const workbook = XLSX.read(csvText, { type: 'string', raw: true, dense: true });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    if (!sheet || !sheet['!ref']) throw new Error('Google Sheets sayfasında veri bulunamadı.');
-    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false, raw: true });
-    const headers = (matrix.shift() || []).map(h => String(h ?? '').trim());
-    const required = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge','Bakiye','Sipariş','Cari Hesap Adı','Dağıtım Kanalı'];
-    const missing = required.filter(h => !headers.includes(h));
-    if (missing.length) throw new Error('Google Sheets sayfasında eksik sütun başlığı: ' + missing.join(', '));
-    if (!matrix.length) throw new Error('Google Sheets sayfasında yüklenecek satır yok.');
-
-    for (let start = 0; start < matrix.length; start += DB_BATCH_SIZE) {
-      const part = matrix.slice(start, start + DB_BATCH_SIZE);
-      const rows = part.map(values => {
-        const row = {};
-        headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
-        return normalizeUploadRow(row);
-      });
-      await saveDataChunk(newPrefix, batchCount, rows);
-      rowCount += rows.length;
-      batchCount++;
-      console.log('Google Sheets kayıt:', rowCount, '/', matrix.length);
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-    if (!rowCount) throw new Error('Google Sheets verisinden kayıt oluşturulamadı.');
-
-    // Yeni veri tamamen yazıldıktan sonra aktif veri kümesini değiştir.
-    await commitDataBatches(newPrefix, batchCount, rowCount);
-
-    // Eski Excel/Google Sheets parçalarını temizle; yeni veri ve meta kaydı korunur.
-    const keyTx = db.transaction([STORE_NAME], 'readonly');
-    const keys = await idbRequest(keyTx.objectStore(STORE_NAME).getAllKeys());
-    const oldKeys = keys.filter(k => k === 'records' ||
-      (typeof k === 'string' && k.startsWith('records_') &&
-       k !== 'records_meta' && !k.startsWith(newPrefix + '_')));
-    if (oldKeys.length) {
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction([STORE_NAME], 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        oldKeys.forEach(k => store.delete(k));
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error || new Error('Eski veriler temizlenemedi.'));
-      });
-    }
-    await loadData();
-    console.log('Google Sheets senkronizasyonu tamamlandı:', data.length, 'kayıt');
-    return true;
-  } catch (err) {
-    console.error('Google Sheets bağlantı hatası:', err);
-    // Başarısız senkronizasyonda önceki kayıtları koru, yalnızca yarım kalan yeni parçaları sil.
-    try {
-      if (db) {
-        const tx = db.transaction([STORE_NAME], 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const keys = await idbRequest(store.getAllKeys());
-        keys.filter(k => typeof k === 'string' && k.startsWith(newPrefix + '_')).forEach(k => store.delete(k));
-      }
-    } catch (cleanupError) { console.warn('Geçici Google Sheets kayıtları temizlenemedi:', cleanupError); }
-    return false;
-  }
+function getSheetUrl() {
+  const el = document.getElementById('sheetUrl');
+  let saved = '';
+  try { saved = localStorage.getItem(SHEET_URL_KEY) || ''; } catch (e) {}
+  return (el && el.value.trim()) || saved || SHEET_URL_DEFAULT;
 }
 
-async function handleFile(file) {
-  if (!file) return;
-  const input = document.getElementById('fileInput');
-  if (input) input.disabled = true;
+function sheetCsvCandidates(url) {
+  const id = (url.match(/\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
+  if (!id) throw new Error('Geçerli bir Google Sheets bağlantısı girin.');
+  const gid = (url.match(/[#&?]gid=(\d+)/) || [])[1];
+  const g = gid ? '&gid=' + gid : '';
+  return [
+    'https://docs.google.com/spreadsheets/d/' + id + '/export?format=csv' + g,
+    'https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq?tqx=out:csv' + g
+  ];
+}
+
+async function fetchSheetCsv(url) {
+  let lastErr = null;
+  for (const cand of sheetCsvCandidates(url)) {
+    try {
+      const res = await fetch(cand, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if (/^\s*<(!doctype|html)/i.test(text)) throw new Error('Tablo herkese açık değil (giriş sayfası döndü).');
+      if (!text.trim()) throw new Error('Tablo boş döndü.');
+      return text.replace(/^\uFEFF/, '');
+    } catch (e) { lastErr = e; }
+  }
+  throw new Error('Google Sheets verisi alınamadı. Tablonun "Bağlantıya sahip herkes görüntüleyebilir" olarak paylaşıldığından ve internet bağlantısından emin olun. (' + (lastErr && lastErr.message ? lastErr.message : lastErr) + ')');
+}
+
+function updateSyncInfo() {
+  const el = document.getElementById('lastSyncInfo');
+  if (!el) return;
+  el.textContent = dataUpdatedAt ? 'Son güncelleme: ' + new Date(dataUpdatedAt).toLocaleString('tr-TR') : 'Henüz veri çekilmedi';
+}
+
+async function syncFromSheet(opts) {
+  opts = opts || {};
+  if (syncing) return false;
+  syncing = true;
+  const btn = document.getElementById('syncBtn');
+  if (btn) btn.disabled = true;
   document.getElementById('uploadMsg').textContent = '';
-  updateUploadProgress(0, 'Dosya okunuyor: ' + file.name);
+  updateUploadProgress(0, 'Google Sheets bağlantısı kuruluyor...');
 
   const newPrefix = 'records_' + Date.now();
-  let batchCount = 0;
-  let rowCount = 0;
+  let batchCount = 0, rowCount = 0;
 
   try {
     if (!db) {
       const ok = await initDB();
       if (!ok) throw new Error('Tarayıcı veri alanı açılamadı.');
     }
+    const url = getSheetUrl();
+    updateUploadProgress(2, 'Google Sheets verisi indiriliyor...');
+    const csv = await fetchSheetCsv(url);
+    try { localStorage.setItem(SHEET_URL_KEY, url); } catch (e) {}
 
-    const buffer = await file.arrayBuffer();
-    updateUploadProgress(2, 'Excel dosyası açılıyor...');
-    const workbook = XLSX.read(buffer, { type: 'array', dense: true });
+    updateUploadProgress(10, 'Veri çözümleniyor...');
+    await new Promise(r => setTimeout(r, 0));
+    const workbook = XLSX.read(csv, { type: 'string', raw: true, dense: true });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    if (!sheet || !sheet['!ref']) throw new Error('Excel sayfasında okunabilir veri bulunamadı.');
+    if (!sheet || !sheet['!ref']) throw new Error('Tabloda okunabilir veri bulunamadı.');
 
     const range = XLSX.utils.decode_range(sheet['!ref']);
     const headerRows = XLSX.utils.sheet_to_json(sheet, {
@@ -657,7 +618,6 @@ async function handleFile(file) {
     const required = ['Yıl','Bölge','Ürün','İl','Ay','Yönetici','Bütçe','Satış','Ürün Adı','Ürün Grubu','TKK Bölge','Bakiye','Sipariş','Cari Hesap Adı','Dağıtım Kanalı'];
     const missing = required.filter(h => !headers.includes(h));
     if (missing.length) throw new Error('Eksik sütun başlığı: ' + missing.join(', '));
-    if (!headers.length) throw new Error('Excel başlık satırı okunamadı.');
 
     const firstDataRow = range.s.r + 1;
     const totalSheetRows = Math.max(0, range.e.r - firstDataRow + 1);
@@ -677,12 +637,11 @@ async function handleFile(file) {
         batchCount++;
       }
       const processed = endRow - firstDataRow + 1;
-      updateUploadProgress(5 + (processed / totalSheetRows) * 90,
-        fmt(processed) + ' / ' + fmt(totalSheetRows) + ' satır tarandı — ' + fmt(rowCount) + ' kayıt kaydedildi');
+      updateUploadProgress(15 + (processed / totalSheetRows) * 80,
+        fmt(processed) + ' / ' + fmt(totalSheetRows) + ' satır işlendi — ' + fmt(rowCount) + ' kayıt kaydedildi');
       await new Promise(resolve => setTimeout(resolve, 0));
     }
-
-    if (!rowCount) throw new Error('Excel dosyasında yüklenecek kayıt bulunamadı.');
+    if (!rowCount) throw new Error('Tabloda yüklenecek kayıt bulunamadı.');
 
     // Yeni veri eksiksiz yazıldıktan sonra aktif veri kümesini değiştir.
     await commitDataBatches(newPrefix, batchCount, rowCount);
@@ -709,40 +668,59 @@ async function handleFile(file) {
     const batchReads = [];
     for (let i = 0; i < batchCount; i++) batchReads.push(idbRequest(readStore.get(newPrefix + '_' + i)));
     data = (await Promise.all(batchReads)).flatMap(x => Array.isArray(x) ? x : []);
+    dataUpdatedAt = new Date().toISOString();
 
-    updateUploadProgress(100, fmt(rowCount) + ' kayıt başarıyla yüklendi.');
-    msg('uploadMsg', fmt(rowCount) + ' kayıt parça parça kaydedildi ve kullanıma hazır.', 'ok');
-    renderPreview();
-    if (!document.getElementById('satisView').classList.contains('hidden')) {
-      initFilters();
-      renderDashboard();
+    updateUploadProgress(100, fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi.');
+    msg('uploadMsg', fmt(rowCount) + ' kayıt Google Sheets\'ten çekildi ve kullanıma hazır.', 'ok');
+    updateSyncInfo();
+    if (opts.refreshUI) {
+      renderPreview();
+      if (!document.getElementById('satisView').classList.contains('hidden')) {
+        initFilters();
+        renderDashboard();
+      }
     }
+    return true;
   } catch (err) {
-    console.error('Dosya yükleme hatası:', err);
+    console.error('Google Sheets veri çekme hatası:', err);
     // Yarım kalan parçaları sil; önceki aktif veri kümesi korunur.
     try {
       const tx = db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const keys = await idbRequest(store.getAllKeys());
-      const partial = keys.filter(k => typeof k === 'string' && k.startsWith(newPrefix + '_'));
-      partial.forEach(k => store.delete(k));
+      keys.filter(k => typeof k === 'string' && k.startsWith(newPrefix + '_')).forEach(k => store.delete(k));
     } catch (cleanupError) { console.warn('Geçici kayıt temizliği:', cleanupError); }
-    updateUploadProgress(0, 'Yükleme tamamlanamadı.');
-    msg('uploadMsg', 'Yükleme hatası: ' + (err && err.message ? err.message : err), 'err');
+    updateUploadProgress(0, 'Veri çekilemedi.');
+    msg('uploadMsg', 'Veri çekme hatası: ' + (err && err.message ? err.message : err), 'err');
+    return false;
   } finally {
-    if (input) input.disabled = false;
+    syncing = false;
+    if (btn) btn.disabled = false;
   }
 }
 
-const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+// Girişte: veri yoksa veya eskiyse Google Sheets'ten otomatik çeker (hata olursa eldeki veri korunur).
+async function autoSyncIfNeeded() {
+  const stale = !data.length || !dataUpdatedAt ||
+    (Date.now() - new Date(dataUpdatedAt).getTime()) > SHEET_REFRESH_MINUTES * 60000;
+  if (!stale) return;
+  const banner = document.getElementById('noDataBanner');
+  const content = document.getElementById('dashboardContent');
+  const showLoading = !data.length && currentUser !== 'admin';
+  if (showLoading) {
+    banner.innerHTML = '<strong>⏳ Veriler Google Sheets\'ten yükleniyor…</strong><br>Lütfen bekleyin.';
+    banner.classList.remove('hidden'); content.classList.add('hidden');
+  }
+  await syncFromSheet({ refreshUI: false });
+  if (showLoading) {
+    banner.innerHTML = '<strong>📭 Henüz veri yüklenmemiş</strong><br>Google Sheets verisi alınamadı. Admin kullanıcısı ile giriş yapıp "Veriyi Çek" butonunu deneyin.';
+  }
+}
 
 async function clearData() {
   if (!confirm('Tüm veriler silinecek. Emin misiniz?')) return;
   try {
-    data = [];
+    data = []; dataUpdatedAt = null;
     await deleteData();
     msg('uploadMsg', 'Tüm veriler silindi', 'ok');
     renderPreview();
@@ -753,6 +731,7 @@ async function clearData() {
 }
 
 function renderPreview() {
+  updateSyncInfo();
   document.getElementById('recordCount').textContent = data.length;
   const thead = document.querySelector('#previewTable thead');
   const tbody = document.querySelector('#previewTable tbody');
@@ -1945,7 +1924,7 @@ function renderConsumptionPage(){
   if(!data.length){ grid.innerHTML=''; ids.forEach(i=>document.getElementById(i).innerHTML=''); info.textContent='Veri yüklenmemiş.'; return; }
   if(!consumptionHasData()){
     info.textContent='';
-    grid.innerHTML='<div style="grid-column:1/-1;background:#fff7e6;border:1px solid #ffd591;border-radius:12px;padding:16px 18px;color:#7a4a00"><strong>Bu veride TÜKETİM MİKTARI / KOOPERATİF ADI sütunları yok.</strong><br>Admin ekranından, bu iki sütunu da içeren güncel Excel dosyasını yeniden yükleyin.</div>';
+    grid.innerHTML='<div style="grid-column:1/-1;background:#fff7e6;border:1px solid #ffd591;border-radius:12px;padding:16px 18px;color:#7a4a00"><strong>Bu veride TÜKETİM MİKTARI / KOOPERATİF ADI sütunları yok.</strong><br>Google Sheets tablosunda bu iki sütun bulunmalı; Admin ekranından veriyi yeniden çekin.</div>';
     ids.forEach(i=>document.getElementById(i).innerHTML=''); return;
   }
   const years=getSelectedYearsAll();
@@ -2015,7 +1994,7 @@ function showDashboardPage(){
   <header class="ai-head"><div><div class="ai-head-title">✦ GÜBRETAŞ Satış Asistanı</div><div class="ai-head-sub">Yerel veri analizi • İnternet ve API gerekmez</div></div><div style="display:flex;gap:4px;align-items:center"><button id="aiAssistantClose" type="button" aria-label="Kapat">×</button></div></header>
 
   <div class="ai-suggestions"><button type="button" data-ai-q="Bütçe gerçekleşmesini bölge bazında analiz et; en geride kalanları sırala.">Bölge analizi</button><button type="button" data-ai-q="Bütçesi olup satışı sıfır olan ürünleri bul ve önem sırasına koy.">Satışsız ürünler</button><button type="button" data-ai-q="Satış yöneticilerinin performansını bütçe gerçekleşmesine göre değerlendir.">Yönetici performansı</button><button type="button" data-ai-q="Yönetim için kısa bir özet ve gönderime hazır e-posta taslağı oluştur.">Yönetici e-postası</button></div>
-  <div id="aiAssistantMessages" aria-live="polite"><div class="ai-msg assistant">Merhaba! Yüklediğin Excel verisini bu tarayıcıda analiz edebilirim. İnternet bağlantısı veya API anahtarı gerekmez. Bölge, ürün, yönetici, yıl ve bütçe gerçekleşmesiyle ilgili sorularını yazabilirsin. Sonuçlar yüklenen verilerden hesaplanır; veride bulunmayan nedenleri varsaymam.</div></div>
+  <div id="aiAssistantMessages" aria-live="polite"><div class="ai-msg assistant">Merhaba! Google Sheets'ten çekilen veriyi bu tarayıcıda analiz edebilirim. API anahtarı gerekmez. Bölge, ürün, yönetici, yıl ve bütçe gerçekleşmesiyle ilgili sorularını yazabilirsin. Sonuçlar yüklenen verilerden hesaplanır; veride bulunmayan nedenleri varsaymam.</div></div>
   <form id="aiAssistantForm" class="ai-compose"><textarea id="aiAssistantQuestion" placeholder="Örn. 2026 yılında bütçesi olup satışı olmayan ürünleri analiz et..." required></textarea><div class="ai-compose-row"><small id="aiAssistantStatus">Yerel analiz etkin • Veriler cihazında kalır.</small><button id="aiAssistantSend" class="ai-send" type="submit">Gönder ↑</button></div></form>
 </section>
 <script id="ai-assistant-client">
@@ -2044,7 +2023,7 @@ function showDashboardPage(){
  function groupAI(rows,key){const m=new Map();rows.forEach(r=>{const name=String(r[key]??'').trim()||'(Boş)';if(!m.has(name))m.set(name,{name,rows:0,budget:0,sales:0});const x=m.get(name);x.rows++;x.budget+=Number(r['Bütçe'])||0;x.sales+=Number(r['Satış'])||0});return [...m.values()].map(x=>({...x,diff:x.sales-x.budget,pct:x.budget?x.sales/x.budget*100:0})).sort((a,b)=>b.sales-a.sales)}
  function reportGroup(title,list,limit=10){if(!list.length)return title+': Bu kırılımda veri bulunamadı.';return title+'\n'+list.slice(0,limit).map((x,i)=>`${i+1}. ${x.name} — Satış: ${moneyAI(x.sales)} | Bütçe: ${moneyAI(x.budget)} | Fark: ${moneyAI(x.diff)} | Gerçekleşme: ${pctAI(x.pct)}`).join('\n')}
  function localAnalyze(q){
-   if(!Array.isArray(data)||!data.length)return "Henüz veri yüklenmemiş. Önce dashboard'a giriş yapıp Excel dosyanı yükle.";
+   if(!Array.isArray(data)||!data.length)return "Henüz veri yüklenmemiş. Önce admin ekranından Google Sheets verisini çek.";
    const t=q.toLocaleLowerCase('tr-TR');
    const _qYear=t.match(/\b(20\d{2})\b/);
    const _match=buildRowMatcher();
@@ -2109,6 +2088,65 @@ function showDashboardPage(){
  form.addEventListener('submit',e=>{e.preventDefault();sendQuestion(question.value)});
  question.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit()}});
 })();
+</script>
+
+
+<style id="dashboard-pdf-print-styles">
+@page { size: A4 landscape; margin: 10mm; }
+@media print {
+  html, body { background:#fff !important; color:#172033 !important; width:100% !important; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  body { font-size:10px !important; }
+  #loginView, #adminView, .topbar-actions, .filters, #aiAssistantLauncher, #aiAssistantPanel,
+  #chartModal, .chart-modal, button, .no-data-banner { display:none !important; }
+  #satisView { display:block !important; }
+  #satisView > .topbar { position:static !important; height:auto !important; min-height:32px; padding:0 0 8px !important; border-bottom:1px solid #d8dee8 !important; background:#fff !important; }
+  #salesTopTitle { display:block !important; font-size:18px !important; color:#172033 !important; }
+  #satisView .container { max-width:none !important; width:100% !important; padding:10px 0 0 !important; margin:0 !important; }
+  #dashboardContent { display:block !important; }
+  .chart-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:8px !important; }
+  .chart-card, .budget-list-card, .manager-compare-card, .kpi, .budget-page-head { box-shadow:none !important; break-inside:avoid !important; page-break-inside:avoid !important; }
+  .chart-card { padding:9px !important; }
+  .chart-wrap, .chart-wrap.wide { height:260px !important; min-height:260px !important; overflow:visible !important; }
+  .table-wrap, .manager-compare-table-wrap, .summary-table-wrap, .budget-list-card,
+  .chart-modal-table-wrap { max-height:none !important; height:auto !important; overflow:visible !important; }
+  table { width:100% !important; font-size:9px !important; }
+  th, td { padding:5px 6px !important; }
+  .budget-table { min-width:0 !important; }
+  .budget-kpi-grid { grid-template-columns:repeat(4,minmax(0,1fr)) !important; }
+  .kpi-value { font-size:17px !important; }
+  .kpi-year-row, .kpi-area .kpi-fark-row { break-inside:avoid !important; }
+  .chart-title, .budget-list-title { font-size:12px !important; }
+  .chart-subtitle, .budget-list-subtitle { font-size:9px !important; }
+  .hidden { display:none !important; }
+  #budgetPageContent:not(.hidden), #balancePageContent:not(.hidden), #consumptionPageContent:not(.hidden) { display:block !important; }
+  #detailTable { max-height:none !important; }
+  canvas, svg { max-width:100% !important; }
+}
+</style>
+<script id="dashboard-pdf-export">
+function exportDashboardPDF(){
+  const title=document.getElementById('salesTopTitle');
+  if(!title || document.getElementById('satisView').classList.contains('hidden')){
+    alert('PDF almak için önce Satış ekranını açın.');
+    return;
+  }
+  // Grafiklerin yazdırma ölçülerine göre yeniden çizilmesini sağla.
+  try {
+    if (window.echarts) {
+      document.querySelectorAll('#satisView .chart-wrap').forEach(el=>{
+        const chart=echarts.getInstanceByDom(el);
+        if(chart) chart.resize();
+      });
+    }
+  } catch(e) { console.warn('Grafik yazdırma boyutlandırması:',e); }
+  const oldTitle=document.title;
+  const cleanTitle=(title.textContent||'GUBRETAS_Dashboard').replace(/[\\/:*?"<>|]+/g,' ').trim();
+  document.title=cleanTitle+' - '+new Date().toLocaleDateString('tr-TR');
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{document.title=oldTitle;try{if(window.echarts)echarts.getInstanceByDom&&document.querySelectorAll('#satisView .chart-wrap').forEach(el=>{const c=echarts.getInstanceByDom(el);if(c)c.resize();});}catch(e){}},700);
+  },350);
+}
 </script>
 
 </body>
